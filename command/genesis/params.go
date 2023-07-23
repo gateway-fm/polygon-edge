@@ -333,7 +333,7 @@ func (p *genesisParams) initIBFTExtraData() {
 	}
 
 	p.extraData = make([]byte, signer.IstanbulExtraVanity)
-	p.extraData = ibftExtra.MarshalRLPTo(p.extraData)
+	p.extraData = ibftExtra.MarshalRLPTo(p.extraData, signer.EncodeEverything)
 }
 
 func (p *genesisParams) initConsensusEngineConfig() {

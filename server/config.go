@@ -17,9 +17,12 @@ const DefaultJSONRPCPort int = 8545
 type Config struct {
 	Chain *chain.Chain
 
-	JSONRPC    *JSONRPC
-	GRPCAddr   *net.TCPAddr
-	LibP2PAddr *net.TCPAddr
+	JSONRPC      *JSONRPC
+	GRPCAddr     *net.TCPAddr
+	LibP2PAddr   *net.TCPAddr
+	DevP2PAddr   *net.TCPAddr
+	DevP2PSyncTo uint64
+	DevP2PPeers  string
 
 	PriceLimit         uint64
 	MaxAccountEnqueued uint64

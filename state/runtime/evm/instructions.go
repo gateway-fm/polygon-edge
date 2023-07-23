@@ -468,6 +468,16 @@ func opSload(c *state) {
 	if c.config.Istanbul {
 		// eip-1884
 		gas = 800
+
+		if c.config.EIP2929 {
+			// have we accessed this slot before?
+			ap, sp := c.accessList.AddSlot(c.msg.Address, bigToHash(loc))
+			if ap || sp {
+				gas = 2100
+			} else {
+				gas = 100
+			}
+		}
 	} else if c.config.EIP150 {
 		gas = 200
 	} else {
@@ -479,6 +489,7 @@ func opSload(c *state) {
 	}
 
 	val := c.host.GetStorage(c.msg.Address, bigToHash(loc))
+
 	loc.SetBytes(val.Bytes())
 }
 
@@ -491,7 +502,6 @@ func opSStore(c *state) {
 
 	if c.config.Istanbul && c.gas <= 2300 {
 		c.exit(errOutOfGas)
-
 		return
 	}
 
@@ -503,35 +513,55 @@ func opSStore(c *state) {
 	status := c.host.SetStorage(c.msg.Address, key, val, c.config)
 	cost := uint64(0)
 
+	if c.config.EIP2929 {
+		// have we accessed this slot before?  if not apply the cold storage cost
+		ap, sp := c.accessList.AddSlot(c.msg.Address, key)
+		if ap || sp {
+			cost += 2100
+		}
+	}
+
 	switch status {
 	case runtime.StorageUnchanged:
 		if c.config.Istanbul {
-			// eip-2200
-			cost = 800
+			if c.config.EIP2929 {
+				cost += 100 // warm storage access cost only
+			} else {
+				// eip-2200
+				cost += 800
+			}
 		} else if legacyGasMetering {
-			cost = 5000
+			cost += 5000
 		} else {
-			cost = 200
+			cost += 200
 		}
 
 	case runtime.StorageModified:
-		cost = 5000
+		if c.config.EIP2929 {
+			cost += 2900
+		} else {
+			cost += 5000
+		}
 
 	case runtime.StorageModifiedAgain:
 		if c.config.Istanbul {
-			// eip-2200
-			cost = 800
+			if c.config.EIP2929 {
+				cost += 100 // warm storage access cost only
+			} else {
+				// eip-2200
+				cost += 800
+			}
 		} else if legacyGasMetering {
-			cost = 5000
+			cost += 5000
 		} else {
-			cost = 200
+			cost += 200
 		}
 
 	case runtime.StorageAdded:
-		cost = 20000
+		cost += 20000
 
 	case runtime.StorageDeleted:
-		cost = 5000
+		cost += 5000
 	}
 
 	if !c.consumeGas(cost) {
@@ -578,6 +608,15 @@ func opBalance(c *state) {
 	if c.config.Istanbul {
 		// eip-1884
 		gas = 700
+		if c.config.EIP2929 {
+			// check if we've accessed this address before
+			added := c.accessList.AddAddress(addr)
+			if added {
+				gas = 2600
+			} else {
+				gas = 100
+			}
+		}
 	} else if c.config.EIP150 {
 		gas = 400
 	} else {
@@ -658,7 +697,15 @@ func opExtCodeSize(c *state) {
 	addr, _ := c.popAddr()
 
 	var gas uint64
-	if c.config.EIP150 {
+	if c.config.EIP2929 {
+		// have we accessed this address before?  if not apply the cold storage cost
+		added := c.accessList.AddAddress(addr)
+		if added {
+			gas = 2600
+		} else {
+			gas = 100
+		}
+	} else if c.config.EIP150 {
 		gas = 700
 	} else {
 		gas = 20
@@ -695,6 +742,15 @@ func opExtCodeHash(c *state) {
 	var gas uint64
 	if c.config.Istanbul {
 		gas = 700
+		if c.config.EIP2929 {
+			// check if we've accessed this address before
+			added := c.accessList.AddAddress(address)
+			if added {
+				gas = 2600
+			} else {
+				gas = 100
+			}
+		}
 	} else {
 		gas = 400
 	}
@@ -767,7 +823,15 @@ func opExtCodeCopy(c *state) {
 	}
 
 	var gas uint64
-	if c.config.EIP150 {
+	if c.config.EIP2929 {
+		// have we accessed this address before?  if not apply the cold storage cost
+		added := c.accessList.AddAddress(address)
+		if added {
+			gas = 2600
+		} else {
+			gas = 100
+		}
+	} else if c.config.EIP150 {
 		gas = 700
 	} else {
 		gas = 20
@@ -941,6 +1005,15 @@ func opSelfDestruct(c *state) {
 		} else if !c.host.AccountExists(address) {
 			gas += 25000
 		}
+
+	}
+
+	if c.config.EIP2929 {
+		// if we haven't accessed this account before we need to pay the cold storage cost
+		ap := c.accessList.ContainsAddress(address)
+		if !ap {
+			gas += 2600
+		}
 	}
 
 	if !c.consumeGas(gas) {
@@ -1093,6 +1166,9 @@ func opCreate(op OpCode) instruction {
 			return
 		}
 
+		// newly created contracts get immediately placed into the touched accounts
+		c.accessList.AddAddress(contract.Address)
+
 		contract.Type = runtime.Create
 
 		// Correct call
@@ -1161,6 +1237,7 @@ func opCall(op OpCode) instruction {
 		}
 
 		contract, offset, size, err := c.buildCallContract(op)
+
 		if err != nil {
 			c.push1().Set(zero)
 
@@ -1226,7 +1303,15 @@ func (c *state) buildCallContract(op OpCode) (*runtime.Contract, uint64, uint64,
 	}
 
 	var gasCost uint64
-	if c.config.EIP150 {
+	if c.config.EIP2929 {
+		// have we accessed the account before?
+		added := c.accessList.AddAddress(addr)
+		if added {
+			gasCost = 2600
+		} else {
+			gasCost = 100
+		}
+	} else if c.config.EIP150 {
 		gasCost = 700
 	} else {
 		gasCost = 40
@@ -1293,6 +1378,7 @@ func (c *state) buildCallContract(op OpCode) (*runtime.Contract, uint64, uint64,
 		gas,
 		c.host.GetCode(addr),
 		args,
+		c.accessList,
 	)
 
 	if op == STATICCALL || parent.msg.Static {
@@ -1384,7 +1470,7 @@ func (c *state) buildCreateContract(op OpCode) (*runtime.Contract, error) {
 		address = crypto.CreateAddress2(c.msg.Address, bigToHash(salt), input)
 	}
 
-	contract := runtime.NewContractCreation(c.msg.Depth+1, c.msg.Origin, c.msg.Address, address, value, gas, input)
+	contract := runtime.NewContractCreation(c.msg.Depth+1, c.msg.Origin, c.msg.Address, address, value, gas, input, c.accessList)
 
 	return contract, nil
 }

@@ -35,6 +35,7 @@ type transaction struct {
 	TxIndex     *argUint64     `json:"transactionIndex"`
 	ChainID     *argBig        `json:"chainID,omitempty"`
 	Type        argUint64      `json:"type"`
+	ChainId     argUint64      `json:"chainId"`
 }
 
 func (t transaction) getHash() types.Hash { return t.Hash }
@@ -138,7 +139,7 @@ func (b *block) Copy() *block {
 	return bb
 }
 
-func toBlock(b *types.Block, fullTx bool) *block {
+func toBlock(b *types.Block, fullTx bool, totalDifficulty *big.Int) *block {
 	h := b.Header
 	res := &block{
 		ParentHash:      h.ParentHash,
@@ -149,7 +150,7 @@ func toBlock(b *types.Block, fullTx bool) *block {
 		ReceiptsRoot:    h.ReceiptsRoot,
 		LogsBloom:       h.LogsBloom,
 		Difficulty:      argUint64(h.Difficulty),
-		TotalDifficulty: argUint64(h.Difficulty), // not needed for POS
+		TotalDifficulty: argUint64(totalDifficulty.Uint64()), // not needed for POS
 		Size:            argUint64(b.Size()),
 		Number:          argUint64(h.Number),
 		GasLimit:        argUint64(h.GasLimit),

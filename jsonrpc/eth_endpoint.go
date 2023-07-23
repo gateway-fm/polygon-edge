@@ -74,12 +74,17 @@ type ethFilter interface {
 	FilterExtra(extra []byte) ([]byte, error)
 }
 
+type ethDifficultyStore interface {
+	GetTotalDifficulty(hash types.Hash) (*big.Int, bool)
+}
+
 // ethStore provides access to the methods needed by eth endpoint
 type ethStore interface {
 	ethTxPoolStore
 	ethStateStore
 	ethBlockchainStore
 	ethFilter
+	ethDifficultyStore
 	gasprice.GasStore
 }
 
@@ -134,7 +139,12 @@ func (e *Eth) GetBlockByNumber(number BlockNumber, fullTx bool) (interface{}, er
 		return nil, err
 	}
 
-	return toBlock(block, fullTx), nil
+	td, ok := e.store.GetTotalDifficulty(block.Hash())
+	if !ok {
+		td = new(big.Int).SetUint64(block.Header.Difficulty)
+	}
+
+	return toBlock(block, fullTx, td), nil
 }
 
 // GetBlockByHash returns information about a block by hash
@@ -148,7 +158,12 @@ func (e *Eth) GetBlockByHash(hash types.Hash, fullTx bool) (interface{}, error) 
 		return nil, err
 	}
 
-	return toBlock(block, fullTx), nil
+	td, ok := e.store.GetTotalDifficulty(hash)
+	if !ok {
+		td = new(big.Int).SetUint64(block.Header.Difficulty)
+	}
+
+	return toBlock(block, fullTx, td), nil
 }
 
 func (e *Eth) filterExtra(block *types.Block) error {
@@ -236,14 +251,16 @@ func (e *Eth) GetTransactionByHash(hash types.Hash) (interface{}, error) {
 
 		// Find the transaction within the block
 		if txn, idx := types.FindTxByHash(block.Transactions, hash); txn != nil {
-			return toTransaction(
-				txn,
-				argUintPtr(block.Number()),
-				argHashPtr(block.Hash()),
-				&idx,
-			)
-		}
-
+			tx := toTransaction(
+					txn,
+					argUintPtr(block.Number()),
+					argHashPtr(block.Hash()),
+					&idx,
+				)
+				tx.ChainId = argUint64(e.chainID)
+				return tx
+        }
+        
 		return nil
 	}
 

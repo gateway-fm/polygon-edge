@@ -208,6 +208,10 @@ func (p *serverParams) initAddresses() error {
 		return err
 	}
 
+	if err := p.initDevP2PAddress(); err != nil {
+		return err
+	}
+
 	if err := p.initNATAddress(); err != nil {
 		return err
 	}
@@ -245,6 +249,19 @@ func (p *serverParams) initLibp2pAddress() error {
 
 	if p.libp2pAddress, parseErr = helper.ResolveAddr(
 		p.rawConfig.Network.Libp2pAddr,
+		helper.LocalHostBinding,
+	); parseErr != nil {
+		return parseErr
+	}
+
+	return nil
+}
+
+func (p *serverParams) initDevP2PAddress() error {
+	var parseErr error
+
+	if p.devp2pAddress, parseErr = helper.ResolveAddr(
+		p.rawConfig.Network.Devp2pAddr,
 		helper.LocalHostBinding,
 	); parseErr != nil {
 		return parseErr

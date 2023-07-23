@@ -1,11 +1,13 @@
 package types
 
 import (
-	"github.com/0xPolygon/polygon-edge/helper/keccak"
 	"github.com/umbracle/fastrlp"
+
+	"github.com/0xPolygon/polygon-edge/helper/keccak"
 )
 
 var HeaderHash func(h *Header) Hash
+var HeaderHashWithoutSeals func(h *Header) Hash
 
 // This is the default header hash for the block.
 // In IBFT, this header hash method is substituted
@@ -35,4 +37,8 @@ func (h *Header) ComputeHash() *Header {
 	h.Hash = HeaderHash(h)
 
 	return h
+}
+
+func (h *Header) ComputeHashWithoutSeals() Hash {
+	return HeaderHashWithoutSeals(h)
 }

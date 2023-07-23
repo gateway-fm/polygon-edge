@@ -7,6 +7,8 @@ import (
 
 	"github.com/0xPolygon/go-ibft/messages"
 	protoIBFT "github.com/0xPolygon/go-ibft/messages/proto"
+	"github.com/umbracle/fastrlp"
+
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
@@ -48,13 +50,31 @@ func (i *backendIBFT) calculateProposalHash(
 		return header.Hash, nil
 	}
 
+	// hash should be a concatenation of the message type (0 for a proposal) and the
+	// rlp encoding of the proposal (a list with 2 elements, the round, and the block hash without seals)
+
 	roundBytes := make([]byte, 8)
 	binary.BigEndian.PutUint64(roundBytes, *round)
 
+	headerHash := signer.CalculateHeaderHashNoFilter(header)
+
+	arena := fastrlp.DefaultArenaPool.Get()
+	defer fastrlp.DefaultArenaPool.Put(arena)
+
+	list := arena.NewArray()
+	list.Set(arena.NewBytes(roundBytes))
+	list.Set(arena.NewBytes(headerHash.Bytes()))
+
+	var listBytes []byte
+	listBytes = list.MarshalTo(listBytes)
+
 	return types.BytesToHash(
 		crypto.Keccak256(
-			header.Hash.Bytes(),
-			roundBytes,
+			[]byte{0},
+			listBytes,
+			//header.ComputeHashWithoutSeals().Bytes(),
+			//header.Hash.Bytes(),
+			//roundBytes,
 		),
 	), nil
 }

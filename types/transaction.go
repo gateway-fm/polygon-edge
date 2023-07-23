@@ -19,6 +19,7 @@ type TxType byte
 // List of supported transaction types
 const (
 	LegacyTx     TxType = 0x0
+	AccessListTx        = 0x01
 	StateTx      TxType = 0x7f
 	DynamicFeeTx TxType = 0x02
 )
@@ -67,6 +68,14 @@ type Transaction struct {
 
 	// Cache
 	size atomic.Pointer[uint64]
+
+	AccessList []AccessTuple
+	ChainId    *big.Int
+}
+
+type AccessTuple struct {
+	Address     *Address
+	StorageKeys []Hash
 }
 
 // IsContractCreation checks if tx is contract creation

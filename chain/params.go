@@ -76,17 +76,25 @@ func (p *Params) GetEngine() string {
 	return ""
 }
 
+func (p *Params) IsPalm() bool {
+	return p.ChainID == 11297108099 || // testnet
+		p.ChainID == 11297108109 // mainnet
+}
+
 // predefined forks
 const (
-	Homestead           = "homestead"
-	Byzantium           = "byzantium"
-	Constantinople      = "constantinople"
-	Petersburg          = "petersburg"
-	Istanbul            = "istanbul"
-	London              = "london"
-	EIP150              = "EIP150"
-	EIP158              = "EIP158"
-	EIP155              = "EIP155"
+	EIP2929        = "EIP2929"
+	EIP155         = "EIP155"
+	EIP158         = "EIP158"
+	EIP150         = "EIP150"
+	Berlin         = "berlin"
+	London         = "london"
+	Istanbul       = "istanbul"
+	Petersburg     = "petersburg"
+	Constantinople = "constantinople"
+	Byzantium      = "byzantium"
+	Homestead      = "homestead"
+	EIP2930        = "EIP2930"
 	QuorumCalcAlignment = "quorumcalcalignment"
 	TxHashWithType      = "txHashWithType"
 )
@@ -113,15 +121,18 @@ func (f *Forks) RemoveFork(name string) {
 // At returns ForksInTime instance that shows which supported forks are enabled for the block
 func (f *Forks) At(block uint64) ForksInTime {
 	return ForksInTime{
-		Homestead:           f.IsActive(Homestead, block),
-		Byzantium:           f.IsActive(Byzantium, block),
-		Constantinople:      f.IsActive(Constantinople, block),
-		Petersburg:          f.IsActive(Petersburg, block),
-		Istanbul:            f.IsActive(Istanbul, block),
-		London:              f.IsActive(London, block),
-		EIP150:              f.IsActive(EIP150, block),
-		EIP158:              f.IsActive(EIP158, block),
-		EIP155:              f.IsActive(EIP155, block),
+		Homestead:      f.IsActive(Homestead, block),
+		Byzantium:      f.IsActive(Byzantium, block),
+		Constantinople: f.IsActive(Constantinople, block),
+		Petersburg:     f.IsActive(Petersburg, block),
+		Istanbul:       f.IsActive(Istanbul, block),
+		London:         f.IsActive(London, block),
+		Berlin:         f.IsActive(Berlin, block),
+		EIP150:         f.IsActive(EIP150, block),
+		EIP158:         f.IsActive(EIP158, block),
+		EIP155:         f.IsActive(EIP155, block),
+		EIP2929:        f.IsActive(EIP2929, block),
+		EIP2930:        f.IsActive(EIP2930, block),
 		QuorumCalcAlignment: f.IsActive(QuorumCalcAlignment, block),
 		TxHashWithType:      f.IsActive(TxHashWithType, block),
 	}
@@ -148,24 +159,30 @@ type ForksInTime struct {
 	Petersburg,
 	Istanbul,
 	London,
+	Berlin,
 	EIP150,
 	EIP158,
 	EIP155,
+	EIP2929,
+	EIP2930,
 	QuorumCalcAlignment,
 	TxHashWithType bool
 }
 
 // AllForksEnabled should contain all supported forks by current edge version
 var AllForksEnabled = &Forks{
-	Homestead:           NewFork(0),
-	EIP150:              NewFork(0),
-	EIP155:              NewFork(0),
-	EIP158:              NewFork(0),
-	Byzantium:           NewFork(0),
-	Constantinople:      NewFork(0),
-	Petersburg:          NewFork(0),
-	Istanbul:            NewFork(0),
-	London:              NewFork(0),
+	Homestead:      NewFork(0),
+	EIP150:         NewFork(0),
+	EIP155:         NewFork(0),
+	EIP158:         NewFork(0),
+	Byzantium:      NewFork(0),
+	Constantinople: NewFork(0),
+	Petersburg:     NewFork(0),
+	Istanbul:       NewFork(0),
+	London:         NewFork(0),
+	Berlin:         NewFork(0),
+	EIP2929:        NewFork(0),
+	EIP2930:        NewFork(0),
 	QuorumCalcAlignment: NewFork(0),
 	TxHashWithType:      NewFork(0),
 }

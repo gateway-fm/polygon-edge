@@ -1,10 +1,11 @@
 package buildroot
 
 import (
+	"github.com/umbracle/fastrlp"
+
 	"github.com/0xPolygon/polygon-edge/helper/keccak"
 	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/umbracle/fastrlp"
 )
 
 var arenaPool fastrlp.ArenaPool
@@ -13,10 +14,12 @@ var arenaPool fastrlp.ArenaPool
 func CalculateReceiptsRoot(receipts []*types.Receipt) types.Hash {
 	ar := arenaPool.Get()
 
-	res := calculateRootWithRlp(len(receipts), func(i int) *fastrlp.Value {
+	res := calculateRootWithRlp(len(receipts), func(i int) (*fastrlp.Value, types.TxType) {
 		ar.Reset()
 
-		return receipts[i].MarshalRLPWith(ar)
+		r := receipts[i]
+
+		return r.MarshalRLPWith(ar), r.TransactionType
 	})
 
 	arenaPool.Put(ar)
@@ -53,9 +56,17 @@ func CalculateUncleRoot(uncles []*types.Header) types.Hash {
 	return types.BytesToHash(root)
 }
 
-func calculateRootWithRlp(num int, h func(indx int) *fastrlp.Value) types.Hash {
+func calculateRootWithRlp(num int, h func(indx int) (val *fastrlp.Value, typ types.TxType)) types.Hash {
 	hF := func(indx int) []byte {
-		return h(indx).MarshalTo(nil)
+		val, typ := h(indx)
+		b := val.MarshalTo(nil)
+
+		// we need to prepend the transaction type if it is not a legacy transaction
+		if typ != types.LegacyTx {
+			b = append([]byte{byte(typ)}, b...)
+		}
+
+		return b
 	}
 
 	return CalculateRoot(num, hF)

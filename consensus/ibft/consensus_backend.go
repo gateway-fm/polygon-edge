@@ -8,6 +8,7 @@ import (
 
 	"github.com/0xPolygon/go-ibft/messages"
 	"github.com/0xPolygon/go-ibft/messages/proto"
+
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
@@ -196,7 +197,8 @@ func (i *backendIBFT) buildBlock(parent *types.Header) (*types.Block, error) {
 		return nil, err
 	}
 
-	i.currentSigner.InitIBFTExtra(header, i.currentValidators, parentCommittedSeals)
+	// TODO [palm] - can we just pass an empty vote here?
+	i.currentSigner.InitIBFTExtra(header, i.currentValidators, parentCommittedSeals, signer.Vote{})
 
 	transition, err := i.executor.BeginTxn(parent.StateRoot, header, i.currentSigner.Address())
 	if err != nil {

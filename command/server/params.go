@@ -4,13 +4,14 @@ import (
 	"errors"
 	"net"
 
+	"github.com/hashicorp/go-hclog"
+	"github.com/multiformats/go-multiaddr"
+
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command/server/config"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/server"
-	"github.com/hashicorp/go-hclog"
-	"github.com/multiformats/go-multiaddr"
 )
 
 const (
@@ -18,6 +19,7 @@ const (
 	genesisPathFlag              = "chain"
 	dataDirFlag                  = "data-dir"
 	libp2pAddressFlag            = "libp2p"
+	devp2pAddressFlag            = "devp2p"
 	prometheusAddressFlag        = "prometheus"
 	natFlag                      = "nat"
 	dnsFlag                      = "dns"
@@ -37,6 +39,10 @@ const (
 	devFlag                      = "dev"
 	corsOriginFlag               = "access-control-allow-origins"
 	logFileLocationFlag          = "log-to"
+
+	// devp2p concerns
+	devp2pSyncTo = "devp2p-sync-to"
+	devp2ppeers  = "devp2p-peers"
 
 	relayerFlag               = "relayer"
 	numBlockConfirmationsFlag = "num-block-confirmations"
@@ -71,6 +77,7 @@ type serverParams struct {
 	configPath string
 
 	libp2pAddress     *net.TCPAddr
+	devp2pAddress     *net.TCPAddr
 	prometheusAddress *net.TCPAddr
 	natAddress        net.IP
 	dnsAddress        multiaddr.Multiaddr
@@ -153,8 +160,11 @@ func (p *serverParams) generateConfig() *server.Config {
 			BatchLengthLimit:         p.rawConfig.JSONRPCBatchRequestLimit,
 			BlockRangeLimit:          p.rawConfig.JSONRPCBlockRangeLimit,
 		},
-		GRPCAddr:   p.grpcAddress,
-		LibP2PAddr: p.libp2pAddress,
+		GRPCAddr:     p.grpcAddress,
+		LibP2PAddr:   p.libp2pAddress,
+		DevP2PAddr:   p.devp2pAddress,
+		DevP2PSyncTo: p.rawConfig.Network.Devp2pSyncTo,
+		DevP2PPeers:  p.rawConfig.Network.Devp2pPeers,
 		Telemetry: &server.Telemetry{
 			PrometheusAddr: p.prometheusAddress,
 		},

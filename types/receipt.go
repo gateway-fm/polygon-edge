@@ -2,6 +2,7 @@ package types
 
 import (
 	goHex "encoding/hex"
+	"fmt"
 	"strings"
 
 	"github.com/0xPolygon/polygon-edge/helper/hex"
@@ -54,6 +55,23 @@ type Log struct {
 const BloomByteLength = 256
 
 type Bloom [BloomByteLength]byte
+
+// BytesToBloom converts a byte slice to a bloom filter.
+// It panics if b is not of suitable size.
+func BytesToBloom(b []byte) Bloom {
+	var bloom Bloom
+	bloom.SetBytes(b)
+	return bloom
+}
+
+// SetBytes sets the content of b to the given bytes.
+// It panics if d is not of suitable size.
+func (b *Bloom) SetBytes(d []byte) {
+	if len(b) < len(d) {
+		panic(fmt.Sprintf("bloom bytes too big %d %d", len(b), len(d)))
+	}
+	copy(b[BloomByteLength-len(d):], d)
+}
 
 func (b *Bloom) UnmarshalText(input []byte) error {
 	input = []byte(strings.TrimPrefix(strings.ToLower(string(input)), "0x"))

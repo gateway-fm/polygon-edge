@@ -66,6 +66,7 @@ require (
 
 require (
 	github.com/dave/jennifer v1.6.1
+	github.com/ethereum/go-ethereum v1.10.26
 	github.com/quasilyte/go-ruleguard v0.3.19
 	github.com/quasilyte/go-ruleguard/dsl v0.3.22
 	github.com/sethvargo/go-retry v0.2.4
@@ -81,14 +82,25 @@ require (
 	github.com/DataDog/datadog-agent/pkg/remoteconfig/state v0.45.0 // indirect
 	github.com/DataDog/go-libddwaf v1.2.0 // indirect
 	github.com/DataDog/go-tuf v0.3.0--fix-localmeta-fork // indirect
+	github.com/StackExchange/wmi v0.0.0-20180116203802-5d049714c4a6 // indirect
+	github.com/VictoriaMetrics/fastcache v1.6.0 // indirect
+	github.com/btcsuite/btcd/btcec/v2 v2.2.0 // indirect
+	github.com/deckarep/golang-set v1.8.0 // indirect
 	github.com/go-jose/go-jose/v3 v3.0.0 // indirect
+	github.com/go-ole/go-ole v1.2.1 // indirect
+	github.com/go-stack/stack v1.8.0 // indirect
 	github.com/golang/mock v1.6.0 // indirect
 	github.com/google/s2a-go v0.1.4 // indirect
 	github.com/hashicorp/golang-lru/v2 v2.0.2 // indirect
+	github.com/holiman/bloomfilter/v2 v2.0.3 // indirect
+	github.com/holiman/uint256 v1.2.0 // indirect
 	github.com/ipfs/boxo v0.8.1 // indirect
 	github.com/libp2p/go-yamux/v4 v4.0.0 // indirect
+	github.com/mattn/go-runewidth v0.0.9 // indirect
+	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/onsi/ginkgo/v2 v2.9.2 // indirect
 	github.com/outcaste-io/ristretto v0.2.1 // indirect
+	github.com/prometheus/tsdb v0.7.1 // indirect
 	github.com/quic-go/qpack v0.4.0 // indirect
 	github.com/quic-go/qtls-go1-19 v0.3.2 // indirect
 	github.com/quic-go/qtls-go1-20 v0.2.2 // indirect
@@ -97,6 +109,9 @@ require (
 	github.com/richardartoul/molecule v1.0.1-0.20221107223329-32cfee06a052 // indirect
 	github.com/rogpeppe/go-internal v1.10.0 // indirect
 	github.com/secure-systems-lab/go-securesystemslib v0.6.0 // indirect
+	github.com/shirou/gopsutil v3.21.4-0.20210419000835-c7a38de76ee5+incompatible // indirect
+	github.com/tklauser/go-sysconf v0.3.5 // indirect
+	github.com/tklauser/numcpus v0.2.2 // indirect
 	go.uber.org/dig v1.16.1 // indirect
 	go.uber.org/fx v1.19.2 // indirect
 	golang.org/x/exp v0.0.0-20230626212559-97b1e661b5df // indirect
@@ -140,7 +155,7 @@ require (
 	github.com/go-toolsmith/astequal v1.0.3 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/groupcache v0.0.0-20210331224755-41bb18bfe9da // indirect
-	github.com/golang/snappy v0.0.4 // indirect
+	github.com/golang/snappy v0.0.5-0.20220116011046-fa5810519dcb // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/gopacket v1.1.19 // indirect

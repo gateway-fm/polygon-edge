@@ -5,6 +5,10 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/armon/go-metrics"
+	"github.com/hashicorp/go-hclog"
+	"google.golang.org/grpc"
+
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/fork"
@@ -17,9 +21,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/syncer"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
-	"github.com/armon/go-metrics"
-	"github.com/hashicorp/go-hclog"
-	"google.golang.org/grpc"
 )
 
 const (
@@ -131,25 +132,37 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 		params.Config.Path,
 		epochSize,
 		params.Config.Config,
+		params.Config.Params.IsPalm(),
 	)
 
 	if err != nil {
 		return nil, err
 	}
 
+	sync := syncer.NewSyncer(
+		params.Logger,
+		params.Network,
+		params.Blockchain,
+		time.Duration(params.BlockTime)*3*time.Second,
+	)
+
+	if params.Blockchain.Config().IsPalm() {
+		sync = syncer.NewPalmSyncer(
+			logger,
+			params.Config,
+			params.Blockchain,
+			forkManager,
+		)
+	}
+
 	p := &backendIBFT{
 		// References
-		logger:     logger,
-		blockchain: params.Blockchain,
-		network:    params.Network,
-		executor:   params.Executor,
-		txpool:     params.TxPool,
-		syncer: syncer.NewSyncer(
-			params.Logger,
-			params.Network,
-			params.Blockchain,
-			time.Duration(params.BlockTime)*3*time.Second,
-		),
+		logger:         logger,
+		blockchain:     params.Blockchain,
+		network:        params.Network,
+		executor:       params.Executor,
+		txpool:         params.TxPool,
+		syncer:         sync,
 		secretsManager: params.SecretsManager,
 		Grpc:           params.Grpc,
 		forkManager:    forkManager,
@@ -166,6 +179,8 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 
 	// Istanbul requires a different header hash function
 	p.SetHeaderHash()
+	p.SetHeaderWithoutSealsHash()
+	p.SetHelperHeaderHash()
 
 	return p, nil
 }
@@ -362,9 +377,11 @@ func (i *backendIBFT) verifyHeaderImpl(
 		return ErrInvalidSha3Uncles
 	}
 
-	// difficulty has to match number
-	if header.Difficulty != header.Number {
-		return ErrWrongDifficulty
+	if !i.config.Params.IsPalm() {
+		// difficulty has to match number
+		if header.Difficulty != header.Number {
+			return ErrWrongDifficulty
+		}
 	}
 
 	// ensure the extra data is correctly formatted
@@ -372,21 +389,23 @@ func (i *backendIBFT) verifyHeaderImpl(
 		return err
 	}
 
-	// verify the ProposerSeal
-	if err := verifyProposerSeal(
-		header,
-		headerSigner,
-		validators,
-	); err != nil {
-		return err
-	}
+	if !i.config.Params.IsPalm() {
+		// verify the ProposerSeal
+		if err := verifyProposerSeal(
+			header,
+			headerSigner,
+			validators,
+		); err != nil {
+			return err
+		}
 
-	// verify the ParentCommittedSeals
-	if err := i.verifyParentCommittedSeals(
-		parent, header,
-		shouldVerifyParentCommittedSeals,
-	); err != nil {
-		return err
+		// verify the ParentCommittedSeals
+		if err := i.verifyParentCommittedSeals(
+			parent, header,
+			shouldVerifyParentCommittedSeals,
+		); err != nil {
+			return err
+		}
 	}
 
 	// Additional header verification
@@ -427,30 +446,37 @@ func (i *backendIBFT) VerifyHeader(header *types.Header) error {
 		return err
 	}
 
-	extra, err := headerSigner.GetIBFTExtra(header)
-	if err != nil {
-		return err
-	}
+	//extra, err := headerSigner.GetIBFTExtra(header)
+	//if err != nil {
+	//	return err
+	//}
 
-	hashForCommittedSeal, err := i.calculateProposalHash(
-		headerSigner,
-		header,
-		extra.RoundNumber,
-	)
-	if err != nil {
-		return err
-	}
+	// need the header hash without the seals, just the round number here
+	//hashForCommitment := header.ComputeHashWithoutSeals()
+	//_ = hashForCommitment
 
-	// verify the Committed Seals
-	// CommittedSeals exists only in the finalized header
-	if err := headerSigner.VerifyCommittedSeals(
-		hashForCommittedSeal,
-		extra.CommittedSeals,
-		validators,
-		i.quorumSize(header.Number)(validators),
-	); err != nil {
-		return err
-	}
+	// TODO [palm]: verify the CommitmentSeals - need to figure out how a proposal hash should
+	//  be created - address reversal from the signatures isn't matching with validators
+
+	//hashForCommittedSeal, err := i.calculateProposalHash(
+	//	headerSigner,
+	//	header,
+	//	extra.RoundNumber,
+	//)
+	//if err != nil {
+	//	return err
+	//}
+	//
+	//// verify the Committed Seals
+	//// CommittedSeals exists only in the finalized header
+	//if err := headerSigner.VerifyCommittedSeals(
+	//	hashForCommittedSeal,
+	//	extra.CommittedSeals,
+	//	validators,
+	//	i.quorumSize(header.Number)(validators),
+	//); err != nil {
+	//	return err
+	//}
 
 	return nil
 }
@@ -532,17 +558,39 @@ func (i *backendIBFT) Close() error {
 // SetHeaderHash updates hash calculation function for IBFT
 func (i *backendIBFT) SetHeaderHash() {
 	types.HeaderHash = func(h *types.Header) types.Hash {
-		signer, err := i.forkManager.GetSigner(h.Number)
+		sig, err := i.forkManager.GetSigner(h.Number)
 		if err != nil {
 			return types.ZeroHash
 		}
 
-		hash, err := signer.CalculateHeaderHash(h)
+		hash, err := sig.CalculateHeaderHash(h, signer.ExcludeRoundAndCommitSeals)
 		if err != nil {
 			return types.ZeroHash
 		}
 
 		return hash
+	}
+}
+
+func (i *backendIBFT) SetHeaderWithoutSealsHash() {
+	types.HeaderHashWithoutSeals = func(h *types.Header) types.Hash {
+		sig, err := i.forkManager.GetSigner(h.Number)
+		if err != nil {
+			return types.ZeroHash
+		}
+
+		hash, err := sig.CalculateHeaderHash(h, signer.ExcludeCommitSeals)
+		if err != nil {
+			return types.ZeroHash
+		}
+
+		return hash
+	}
+}
+
+func (i *backendIBFT) SetHelperHeaderHash() {
+	if i.config.Params.IsPalm() {
+		signer.CalculateHeaderHash = signer.CalculateHeaderHashPalm
 	}
 }
 

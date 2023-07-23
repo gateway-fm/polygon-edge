@@ -3,9 +3,10 @@ package network
 import (
 	"net"
 
+	"github.com/multiformats/go-multiaddr"
+
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/secrets"
-	"github.com/multiformats/go-multiaddr"
 )
 
 // Config details the params for the base networking server
@@ -37,4 +38,11 @@ func DefaultConfig() *Config {
 		MaxInboundPeers:  32,
 		MaxOutboundPeers: 8,
 	}
+}
+
+func DefaultDevP2pConfig() *Config {
+	def := DefaultConfig()
+	def.Addr.Port = DefaultDevp2pPort
+
+	return def
 }

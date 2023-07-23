@@ -4,12 +4,13 @@ import (
 	"encoding/binary"
 	"log"
 
+	"github.com/umbracle/ethgo/abi"
+
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/umbracle/ethgo/abi"
 )
 
 var _ runtime.Runtime = &Precompiled{}
@@ -55,6 +56,7 @@ func NewPrecompiled() *Precompiled {
 	return p
 }
 
+// contracts here are also maintained in access_list in the evm package - be sure to update both
 func (p *Precompiled) setupContracts() {
 	p.register("1", &ecrecover{p})
 	p.register("2", &sha256h{})
@@ -156,6 +158,14 @@ func (p *Precompiled) Run(c *runtime.Contract, host runtime.Host, config *chain.
 	}
 
 	return result
+}
+
+func (p *Precompiled) Addresses() []types.Address {
+	var addresses []types.Address
+	for addr := range p.contracts {
+		addresses = append(addresses, addr)
+	}
+	return addresses
 }
 
 var zeroPadding = make([]byte, 64)

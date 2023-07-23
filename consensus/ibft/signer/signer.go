@@ -29,7 +29,7 @@ type Signer interface {
 	Address() types.Address
 
 	// IBFT Extra
-	InitIBFTExtra(*types.Header, validators.Validators, Seals)
+	InitIBFTExtra(*types.Header, validators.Validators, Seals, Vote)
 	GetIBFTExtra(*types.Header) (*IstanbulExtra, error)
 	GetValidators(*types.Header) (validators.Validators, error)
 
@@ -68,24 +68,28 @@ type Signer interface {
 	EcrecoverFromIBFTMessage([]byte, []byte) (types.Address, error)
 
 	// Hash of Header
-	CalculateHeaderHash(*types.Header) (types.Hash, error)
-	FilterHeaderForHash(*types.Header) (*types.Header, error)
+	CalculateHeaderHash(*types.Header, EncodingMode) (types.Hash, error)
+	CalculateHeaderHashNoFilter(*types.Header) types.Hash
+	FilterHeaderForHash(*types.Header, EncodingMode) (*types.Header, error)
 }
 
 // SignerImpl is an implementation that meets Signer
 type SignerImpl struct {
 	keyManager       KeyManager
 	parentKeyManager KeyManager
+	isPalm           bool
 }
 
 // NewSigner is a constructor of SignerImpl
 func NewSigner(
 	keyManager KeyManager,
 	parentKeyManager KeyManager,
+	isPalm bool,
 ) *SignerImpl {
 	return &SignerImpl{
 		keyManager:       keyManager,
 		parentKeyManager: parentKeyManager,
+		isPalm:           isPalm,
 	}
 }
 
@@ -105,11 +109,15 @@ func (s *SignerImpl) InitIBFTExtra(
 	header *types.Header,
 	validators validators.Validators,
 	parentCommittedSeals Seals,
+	vote Vote,
 ) {
 	s.initIbftExtra(
 		header,
 		validators,
 		parentCommittedSeals,
+		vote,
+		EncodeEverything,
+		s.isPalm,
 	)
 }
 
@@ -119,11 +127,17 @@ func (s *SignerImpl) GetIBFTExtra(header *types.Header) (*IstanbulExtra, error) 
 		return nil, err
 	}
 
-	data := header.ExtraData[IstanbulExtraVanity:]
 	extra := &IstanbulExtra{
 		Validators:     s.keyManager.NewEmptyValidators(),
 		ProposerSeal:   []byte{},
 		CommittedSeals: s.keyManager.NewEmptyCommittedSeals(),
+		isPalm:         s.isPalm,
+		Vote:           Vote{},
+	}
+
+	data := header.ExtraData
+	if !s.isPalm {
+		data = header.ExtraData[IstanbulExtraVanity:]
 	}
 
 	if header.Number > 1 {
@@ -139,7 +153,7 @@ func (s *SignerImpl) GetIBFTExtra(header *types.Header) (*IstanbulExtra, error) 
 
 // WriteProposerSeal signs and set ProposerSeal into IBFT Extra of the header
 func (s *SignerImpl) WriteProposerSeal(header *types.Header) (*types.Header, error) {
-	hash, err := s.CalculateHeaderHash(header)
+	hash, err := s.CalculateHeaderHash(header, EncodeEverything)
 	if err != nil {
 		return nil, err
 	}
@@ -161,6 +175,10 @@ func (s *SignerImpl) WriteProposerSeal(header *types.Header) (*types.Header, err
 
 // EcrecoverFromIBFTMessage recovers signer address from given signature and header hash
 func (s *SignerImpl) EcrecoverFromHeader(header *types.Header) (types.Address, error) {
+	if s.isPalm {
+		return types.BytesToAddress(header.Miner), nil
+	}
+
 	extra, err := s.GetIBFTExtra(header)
 	if err != nil {
 		return types.Address{}, err
@@ -234,6 +252,7 @@ func (s *SignerImpl) VerifyCommittedSeals(
 	validators validators.Validators,
 	quorumSize int,
 ) error {
+	//rawMsg := hash.Bytes()
 	rawMsg := crypto.Keccak256(
 		wrapCommitHash(hash.Bytes()),
 	)
@@ -313,23 +332,37 @@ func (s *SignerImpl) initIbftExtra(
 	header *types.Header,
 	validators validators.Validators,
 	parentCommittedSeal Seals,
+	vote Vote,
+	mode EncodingMode,
+	isPalm bool,
 ) {
+	// genesis needs to encode all the extra data
+	if header.Number == 0 {
+		mode = EncodeEverything
+	}
+
 	putIbftExtra(header, &IstanbulExtra{
 		Validators:           validators,
 		ProposerSeal:         []byte{},
 		CommittedSeals:       s.keyManager.NewEmptyCommittedSeals(),
 		ParentCommittedSeals: parentCommittedSeal,
-	})
+		isPalm:               isPalm,
+		Vote:                 vote,
+	}, mode)
 }
 
 // CalculateHeaderHash calculates header hash for IBFT Extra
-func (s *SignerImpl) CalculateHeaderHash(header *types.Header) (types.Hash, error) {
-	filteredHeader, err := s.FilterHeaderForHash(header)
+func (s *SignerImpl) CalculateHeaderHash(header *types.Header, mode EncodingMode) (types.Hash, error) {
+	filteredHeader, err := s.FilterHeaderForHash(header, mode)
 	if err != nil {
 		return types.ZeroHash, err
 	}
 
-	return calculateHeaderHash(filteredHeader), nil
+	return CalculateHeaderHash(filteredHeader), nil
+}
+
+func (s *SignerImpl) CalculateHeaderHashNoFilter(header *types.Header) types.Hash {
+	return CalculateHeaderHash(header)
 }
 
 func (s *SignerImpl) GetValidators(header *types.Header) (validators.Validators, error) {
@@ -361,7 +394,7 @@ func (s *SignerImpl) GetParentCommittedSeals(header *types.Header) (Seals, error
 
 // filterHeaderForHash removes unnecessary fields from IBFT Extra of the header
 // for hash calculation
-func (s *SignerImpl) FilterHeaderForHash(header *types.Header) (*types.Header, error) {
+func (s *SignerImpl) FilterHeaderForHash(header *types.Header, mode EncodingMode) (*types.Header, error) {
 	clone := header.Copy()
 
 	extra, err := s.GetIBFTExtra(header)
@@ -377,8 +410,9 @@ func (s *SignerImpl) FilterHeaderForHash(header *types.Header) (*types.Header, e
 	}
 
 	// This will effectively remove the Seal and CommittedSeals from the IBFT Extra of header,
-	// while keeping proposer vanity, validator set, and ParentCommittedSeals
-	s.initIbftExtra(clone, extra.Validators, parentCommittedSeals)
+	// while keeping proposer vanity, validator set, and ParentCommittedSeals.  The mode
+	// will affect how other fields are treated as well.
+	s.initIbftExtra(clone, extra.Validators, parentCommittedSeals, extra.Vote, mode, s.isPalm)
 
 	return clone, nil
 }

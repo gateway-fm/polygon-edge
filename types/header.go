@@ -62,6 +62,13 @@ func (n Nonce) MarshalText() ([]byte, error) {
 	return []byte(n.String()), nil
 }
 
+// EncodeNonce converts the given integer to a block nonce.
+func EncodeNonce(i uint64) Nonce {
+	var n Nonce
+	binary.BigEndian.PutUint64(n[:], i)
+	return n
+}
+
 func (h *Header) Copy() *Header {
 	newHeader := &Header{
 		ParentHash:   h.ParentHash,

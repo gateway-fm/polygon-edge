@@ -86,6 +86,15 @@ func EncodeBig(bigint *big.Int) string {
 	return fmt.Sprintf("%#x", bigint)
 }
 
+func EncodeBigLegacy(bigint *big.Int) string {
+	if bigint.BitLen() == 0 {
+		return "0000000000000000000000000000000000000000000000000000000000000000"
+	}
+
+	asHex := fmt.Sprintf("%064x", bigint)
+	return asHex
+}
+
 // DecodeHexToBig converts a hex number to a big.Int value
 func DecodeHexToBig(hexNum string) (*big.Int, error) {
 	cleaned := strings.TrimPrefix(hexNum, "0x")

@@ -5,16 +5,18 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math/big"
 	"net"
 	"sync"
 	"sync/atomic"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/blockchain"
-	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/hashicorp/go-hclog"
+
+	"github.com/0xPolygon/polygon-edge/blockchain"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 var (
@@ -228,6 +230,9 @@ type filterManagerStore interface {
 
 	// GetBlockByNumber returns a block using the provided number
 	GetBlockByNumber(num uint64, full bool) (*types.Block, bool)
+
+	// GetBlockTotalDifficulty returns the total difficulty of the block
+	GetTotalDifficulty(hash types.Hash) (*big.Int, bool)
 }
 
 // FilterManager manages all running filters
@@ -267,7 +272,11 @@ func NewFilterManager(logger hclog.Logger, store filterManagerStore, blockRangeL
 
 	//nolint:godox
 	// TODO: Make Header return jsonrpc.block object directly (to be fixed in EVM-524)
-	block := toBlock(&types.Block{Header: header}, false)
+	td, ok := store.GetTotalDifficulty(header.Hash)
+	if !ok {
+		td = new(big.Int).SetUint64(header.Difficulty)
+	}
+	block := toBlock(&types.Block{Header: header}, false, td)
 	m.blockStream = newBlockStream(block)
 
 	// start the head watcher
@@ -639,7 +648,11 @@ func (f *FilterManager) processEvent(evnt *blockchain.Event) {
 	defer f.RUnlock()
 
 	for _, header := range evnt.NewChain {
-		block := toBlock(&types.Block{Header: header}, false)
+		td, ok := f.store.GetTotalDifficulty(header.Hash)
+		if !ok {
+			td = new(big.Int).SetUint64(header.Difficulty)
+		}
+		block := toBlock(&types.Block{Header: header}, false, td)
 
 		// first include all the new headers in the blockstream for BlockFilter
 		f.blockStream.push(block)

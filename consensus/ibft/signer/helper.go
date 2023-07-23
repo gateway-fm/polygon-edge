@@ -5,14 +5,15 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/coinbase/kryptology/pkg/signatures/bls/bls_sig"
+	"github.com/umbracle/fastrlp"
+
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/helper/keccak"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/secrets/helper"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
-	"github.com/coinbase/kryptology/pkg/signatures/bls/bls_sig"
-	"github.com/umbracle/fastrlp"
 )
 
 const (
@@ -21,6 +22,70 @@ const (
 	// for new clients to read old committed seals
 	legacyCommitCode = 2
 )
+
+type CalculateHeaderHashFunc func(h *types.Header) types.Hash
+
+var CalculateHeaderHash CalculateHeaderHashFunc
+
+func init() {
+	CalculateHeaderHash = DefaultHeaderHashFunc
+}
+
+var DefaultHeaderHashFunc = func(h *types.Header) types.Hash {
+	arena := fastrlp.DefaultArenaPool.Get()
+	defer fastrlp.DefaultArenaPool.Put(arena)
+
+	vv := arena.NewArray()
+	vv.Set(arena.NewBytes(h.ParentHash.Bytes()))
+	vv.Set(arena.NewBytes(h.Sha3Uncles.Bytes()))
+	vv.Set(arena.NewCopyBytes(h.Miner))
+	vv.Set(arena.NewBytes(h.StateRoot.Bytes()))
+	vv.Set(arena.NewBytes(h.TxRoot.Bytes()))
+	vv.Set(arena.NewBytes(h.ReceiptsRoot.Bytes()))
+	vv.Set(arena.NewBytes(h.LogsBloom[:]))
+	vv.Set(arena.NewUint(h.Difficulty))
+	vv.Set(arena.NewUint(h.Number))
+	vv.Set(arena.NewUint(h.GasLimit))
+	vv.Set(arena.NewUint(h.GasUsed))
+	vv.Set(arena.NewUint(h.Timestamp))
+	vv.Set(arena.NewCopyBytes(h.ExtraData))
+
+	buf := keccak.Keccak256Rlp(nil, vv)
+
+	return types.BytesToHash(buf)
+}
+
+// CalculateHeaderHashPalm is hash calculation of header for IBFT on the palm network
+var CalculateHeaderHashPalm = func(h *types.Header) types.Hash {
+	arena := fastrlp.DefaultArenaPool.Get()
+	defer fastrlp.DefaultArenaPool.Put(arena)
+
+	vv := arena.NewArray()
+	vv.Set(arena.NewBytes(h.ParentHash.Bytes()))
+	vv.Set(arena.NewBytes(h.Sha3Uncles.Bytes()))
+	vv.Set(arena.NewCopyBytes(h.Miner))
+	vv.Set(arena.NewBytes(h.StateRoot.Bytes()))
+	vv.Set(arena.NewBytes(h.TxRoot.Bytes()))
+	vv.Set(arena.NewBytes(h.ReceiptsRoot.Bytes()))
+	vv.Set(arena.NewBytes(h.LogsBloom[:]))
+	vv.Set(arena.NewUint(h.Difficulty))
+	vv.Set(arena.NewUint(h.Number))
+	vv.Set(arena.NewUint(h.GasLimit))
+	vv.Set(arena.NewUint(h.GasUsed))
+	vv.Set(arena.NewUint(h.Timestamp))
+	vv.Set(arena.NewCopyBytes(h.ExtraData))
+
+	vv.Set(arena.NewBytes(h.MixHash.Bytes()))
+	vv.Set(arena.NewBytes(h.Nonce[:]))
+
+	if h.BaseFee > 0 {
+		vv.Set(arena.NewUint(h.BaseFee))
+	}
+
+	buf := keccak.Keccak256Rlp(nil, vv)
+
+	return types.BytesToHash(buf)
+}
 
 // wrapCommitHash calculates digest for CommittedSeal
 func wrapCommitHash(data []byte) []byte {
@@ -57,31 +122,6 @@ func getOrCreateBLSKey(manager secrets.SecretsManager) (*bls_sig.SecretKey, erro
 	}
 
 	return crypto.BytesToBLSSecretKey(keyBytes)
-}
-
-// calculateHeaderHash is hash calculation of header for IBFT
-func calculateHeaderHash(h *types.Header) types.Hash {
-	arena := fastrlp.DefaultArenaPool.Get()
-	defer fastrlp.DefaultArenaPool.Put(arena)
-
-	vv := arena.NewArray()
-	vv.Set(arena.NewBytes(h.ParentHash.Bytes()))
-	vv.Set(arena.NewBytes(h.Sha3Uncles.Bytes()))
-	vv.Set(arena.NewCopyBytes(h.Miner))
-	vv.Set(arena.NewBytes(h.StateRoot.Bytes()))
-	vv.Set(arena.NewBytes(h.TxRoot.Bytes()))
-	vv.Set(arena.NewBytes(h.ReceiptsRoot.Bytes()))
-	vv.Set(arena.NewBytes(h.LogsBloom[:]))
-	vv.Set(arena.NewUint(h.Difficulty))
-	vv.Set(arena.NewUint(h.Number))
-	vv.Set(arena.NewUint(h.GasLimit))
-	vv.Set(arena.NewUint(h.GasUsed))
-	vv.Set(arena.NewUint(h.Timestamp))
-	vv.Set(arena.NewCopyBytes(h.ExtraData))
-
-	buf := keccak.Keccak256Rlp(nil, vv)
-
-	return types.BytesToHash(buf)
 }
 
 // ecrecover recovers signer address from the given digest and signature
@@ -123,12 +163,12 @@ func verifyIBFTExtraSize(header *types.Header) error {
 }
 
 // UseIstanbulHeaderHash is a helper function for the test
-func UseIstanbulHeaderHashInTest(t *testing.T, signer Signer) {
+func UseIstanbulHeaderHashInTest(t *testing.T, sig Signer) {
 	t.Helper()
 
 	originalHashCalc := types.HeaderHash
 	types.HeaderHash = func(h *types.Header) types.Hash {
-		hash, err := signer.CalculateHeaderHash(h)
+		hash, err := sig.CalculateHeaderHash(h, ExcludeRoundAndCommitSeals)
 		if err != nil {
 			return types.ZeroHash
 		}

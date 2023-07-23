@@ -86,6 +86,7 @@ func (e *Executor) WriteGenesis(
 		gasPool:     uint64(env.GasLimit),
 		config:      config,
 		precompiles: precompiled.NewPrecompiled(),
+		accessList:  runtime.NewAccessList(),
 	}
 
 	for addr, account := range alloc {
@@ -135,6 +136,15 @@ func (e *Executor) ProcessBlock(
 	blockCreator types.Address,
 ) (*Transition, error) {
 	txn, err := e.BeginTxn(parentRoot, block.Header, blockCreator)
+
+	//trCfg := structtracer.Config{
+	//	EnableMemory:     true,
+	//	EnableStack:      true,
+	//	EnableStorage:    true,
+	//	EnableReturnData: true,
+	//	Legacy:           true,
+	//}
+
 	if err != nil {
 		return nil, err
 	}
@@ -144,8 +154,39 @@ func (e *Executor) ProcessBlock(
 			continue
 		}
 
+		// TODO [palm]: remove this!  only in place for debugging EVM
+		//tr := structtracer.NewStructTracer(trCfg)
+		//txn.SetTracer(tr)
+
+		txn.accessList = runtime.NewAccessList()
+
 		if err = txn.Write(t); err != nil {
 			return nil, err
+		}
+
+		txn.state.FinaliseTx()
+
+		// now get the output from the tracer
+		//outputCsv := tr.GetLogsCsv()
+		//e.logger.Trace("Transaction trace", "output", outputCsv)
+	}
+
+	// Palm - now add in the block reward for the creator
+	engineConfig := e.config.Engine
+	if engineConfig != nil {
+		if cfgRaw, ok := engineConfig["ibft"]; ok {
+			// we have an ibft config so add in the block reward
+			if cfg, ok := cfgRaw.(map[string]interface{}); ok {
+				if rewardRaw, ok := cfg["blockreward"]; ok {
+					if reward, ok := rewardRaw.(string); ok {
+						// we have a block reward so add it in
+						blockReward := new(big.Int)
+						blockReward.SetString(reward, 10)
+						txn.state.AddBalance(blockCreator, blockReward)
+					}
+				}
+			}
+
 		}
 	}
 
@@ -216,6 +257,7 @@ func (e *Executor) BeginTxn(
 		evm:         evm.NewEVM(),
 		precompiles: precompiled.NewPrecompiled(),
 		PostHook:    e.PostHook,
+		accessList:  runtime.NewAccessList(),
 	}
 
 	// enable contract deployment allow list (if any)
@@ -278,6 +320,8 @@ type Transition struct {
 	txnBlockList        *addresslist.AddressList
 	bridgeAllowList     *addresslist.AddressList
 	bridgeBlockList     *addresslist.AddressList
+
+	accessList *runtime.AccessList
 }
 
 func NewTransition(config chain.ForksInTime, snap Snapshot, radix *Txn) *Transition {
@@ -335,7 +379,9 @@ func (t *Transition) Write(txn *types.Transaction) error {
 	var err error
 
 	if txn.From == emptyFrom &&
-		(txn.Type == types.LegacyTx || txn.Type == types.DynamicFeeTx) {
+		(txn.Type == types.LegacyTx ||
+			txn.Type == types.DynamicFeeTx ||
+			txn.Type == types.AccessListTx) {
 		// Decrypt the from address
 		signer := crypto.NewSigner(t.config, uint64(t.ctx.ChainID))
 
@@ -665,7 +711,7 @@ func (t *Transition) Create2(
 	gas uint64,
 ) *runtime.ExecutionResult {
 	address := crypto.CreateAddress(caller, t.state.GetNonce(caller))
-	contract := runtime.NewContractCreation(1, caller, caller, address, value, gas, code)
+	contract := runtime.NewContractCreation(1, caller, caller, address, value, gas, code, t.accessList)
 
 	return t.applyCreate(contract, t)
 }
@@ -677,7 +723,7 @@ func (t *Transition) Call2(
 	value *big.Int,
 	gas uint64,
 ) *runtime.ExecutionResult {
-	c := runtime.NewContractCall(1, caller, caller, to, value, gas, t.state.GetCode(to), input)
+	c := runtime.NewContractCall(1, caller, caller, to, value, gas, t.state.GetCode(to), input, t.accessList)
 
 	return t.applyCall(c, runtime.Call, t)
 }
@@ -783,8 +829,15 @@ func (t *Transition) applyCall(
 
 	t.captureCallStart(c, callType)
 
+	// take a copy of the access list, so we can revert if needed on a revert
+	al := t.accessList.Copy()
+
 	result = t.run(c, host)
 	if result.Failed() {
+		if result.Reverted() {
+			t.accessList = al
+		}
+
 		if err := t.state.RevertToSnapshot(snapshot); err != nil {
 			return &runtime.ExecutionResult{
 				GasLeft: c.Gas,

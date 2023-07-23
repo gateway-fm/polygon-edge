@@ -8,6 +8,9 @@ import (
 	"path"
 	"testing"
 
+	"github.com/hashicorp/go-hclog"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	testHelper "github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/0xPolygon/polygon-edge/state"
@@ -15,8 +18,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/validators"
 	"github.com/0xPolygon/polygon-edge/validators/store"
 	"github.com/0xPolygon/polygon-edge/validators/store/snapshot"
-	"github.com/hashicorp/go-hclog"
-	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -266,6 +267,7 @@ func TestSnapshotValidatorStoreWrapper(t *testing.T) {
 				},
 				dirPath,
 				test.epochSize,
+				false,
 			)
 
 			testHelper.AssertErrorMessageContains(
@@ -318,6 +320,7 @@ func TestSnapshotValidatorStoreWrapperGetValidators(t *testing.T) {
 		epochSize,
 		metadata,
 		snapshots,
+		false,
 	)
 
 	assert.NoError(t, err)
@@ -366,6 +369,7 @@ func TestSnapshotValidatorStoreWrapperClose(t *testing.T) {
 		epochSize,
 		metadata,
 		snapshots,
+		false,
 	)
 
 	assert.NoError(t, err)
@@ -470,6 +474,7 @@ func TestNewContractValidatorStoreWrapperGetValidators(t *testing.T) {
 				return signer.NewSigner(
 					&signer.ECDSAKeyManager{},
 					nil,
+					false,
 				), nil
 			},
 		)

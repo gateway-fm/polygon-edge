@@ -65,10 +65,11 @@ func encodeSignature(R, S, V *big.Int, isHomestead bool) ([]byte, error) {
 func calcTxHash(tx *types.Transaction, chainID uint64) types.Hash {
 	a := signerPool.Get()
 	isDynamicFeeTx := tx.Type == types.DynamicFeeTx
+	isAccessListTx := tx.Type == types.AccessListTx
 
 	v := a.NewArray()
 
-	if isDynamicFeeTx {
+	if isDynamicFeeTx || isAccessListTx {
 		v.Set(a.NewUint(chainID))
 	}
 
@@ -93,7 +94,9 @@ func calcTxHash(tx *types.Transaction, chainID uint64) types.Hash {
 
 	v.Set(a.NewCopyBytes(tx.Input))
 
-	if isDynamicFeeTx {
+	if isAccessListTx {
+		types.RlpEncodeAccessList(a, v, tx.AccessList)
+	} else if isDynamicFeeTx {
 		v.Set(a.NewArray())
 	} else {
 		// EIP155
@@ -105,7 +108,7 @@ func calcTxHash(tx *types.Transaction, chainID uint64) types.Hash {
 	}
 
 	var hash []byte
-	if isDynamicFeeTx {
+	if isDynamicFeeTx || isAccessListTx {
 		hash = keccak.PrefixedKeccak256Rlp([]byte{byte(tx.Type)}, nil, v)
 	} else {
 		hash = keccak.Keccak256Rlp(nil, v)

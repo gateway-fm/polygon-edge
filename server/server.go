@@ -12,6 +12,12 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/hashicorp/go-hclog"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"github.com/umbracle/ethgo"
+	"google.golang.org/grpc"
+
 	"github.com/0xPolygon/polygon-edge/blockchain/storage"
 	"github.com/0xPolygon/polygon-edge/blockchain/storage/leveldb"
 	"github.com/0xPolygon/polygon-edge/blockchain/storage/memory"
@@ -41,11 +47,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validate"
-	"github.com/hashicorp/go-hclog"
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
-	"github.com/umbracle/ethgo"
-	"google.golang.org/grpc"
 )
 
 var (
@@ -564,6 +565,9 @@ func (s *Server) setupConsensus() error {
 			return err
 		}
 	}
+
+	engineConfig["devp2p-peers"] = s.config.DevP2PPeers
+	engineConfig["devp2p-addr"] = s.config.DevP2PAddr
 
 	config := &consensus.Config{
 		Params: s.config.Chain.Params,

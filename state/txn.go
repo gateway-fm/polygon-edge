@@ -32,10 +32,11 @@ var (
 
 // Txn is a reference of the state
 type Txn struct {
-	snapshot  readSnapshot
-	snapshots []*iradix.Tree
-	txn       *iradix.Txn
-	codeCache *lru.Cache
+	snapshot   readSnapshot
+	snapshots  []*iradix.Tree
+	txn        *iradix.Txn
+	codeCache  *lru.Cache
+	intraState *iradix.Tree
 }
 
 func NewTxn(snapshot Snapshot) *Txn {
@@ -232,6 +233,50 @@ func (txn *Txn) SetStorage(
 	original := txn.GetCommittedState(addr, key) // storage slot before this transaction started
 
 	txn.SetState(addr, key, value)
+
+	if config.EIP2929 {
+		var refund uint64 = 4800
+		if config.Berlin {
+			refund = 15000
+		}
+
+		if current == original {
+			// clean slot that has not been modified in this tx
+			if original == types.ZeroHash {
+				return runtime.StorageAdded
+			} else {
+				// before returning check if we need to add a refund
+				if value == types.ZeroHash {
+					txn.AddRefund(refund)
+				}
+
+				return runtime.StorageModified
+			}
+		} else {
+			// dirty slot that has had some changes applied in this tx
+			// before returning figure out if we need to add a refund
+			if original != types.ZeroHash {
+				if current == types.ZeroHash {
+					// slot started non-zero, currently zero, now being changed to non-zero
+					txn.SubRefund(refund)
+				} else if value == types.ZeroHash {
+					// started non-zero, currently non-zero, now being changed to zero
+					txn.AddRefund(refund)
+				}
+			}
+
+			if value == original {
+				// slot is being changed back to original value
+				if original == types.ZeroHash {
+					txn.AddRefund(19900)
+				} else {
+					txn.AddRefund(2800)
+				}
+			}
+
+			return runtime.StorageModifiedAgain
+		}
+	}
 
 	legacyGasMetering := !config.Istanbul && (config.Petersburg || !config.Constantinople)
 
@@ -475,6 +520,24 @@ func (txn *Txn) GetCommittedState(addr types.Address, key types.Hash) types.Hash
 		return types.Hash{}
 	}
 
+	if txn.intraState != nil {
+		val, ok := txn.intraState.Get(addr.Bytes())
+		if ok {
+			obj := val.(*StateObject) //nolint:forcetypeassert
+			if obj.Txn != nil {
+				val, ok = obj.Txn.Get(key.Bytes())
+				if ok {
+					if val == nil {
+						return types.Hash{}
+					} else {
+						//nolint:forcetypeassert
+						return types.BytesToHash(val.([]byte))
+					}
+				}
+			}
+		}
+	}
+
 	return txn.snapshot.GetStorage(addr, obj.Account.Root, key)
 }
 
@@ -625,4 +688,9 @@ func (txn *Txn) Commit(deleteEmptyObjects bool) ([]*Object, error) {
 	})
 
 	return objs, nil
+}
+
+func (txn *Txn) FinaliseTx() {
+	t := txn.txn.CommitOnly()
+	txn.intraState = t
 }

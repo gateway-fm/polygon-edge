@@ -5,6 +5,9 @@ import (
 	"path"
 	"testing"
 
+	"github.com/hashicorp/go-hclog"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/hook"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/crypto"
@@ -15,8 +18,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/validators"
 	"github.com/0xPolygon/polygon-edge/validators/store"
 	"github.com/0xPolygon/polygon-edge/validators/store/snapshot"
-	"github.com/hashicorp/go-hclog"
-	"github.com/stretchr/testify/assert"
 )
 
 type mockValidatorStore struct {
@@ -79,6 +80,7 @@ func TestNewForkManager(t *testing.T) {
 			"",
 			0,
 			map[string]interface{}{},
+			false,
 		)
 
 		assert.ErrorIs(t, ErrUndefinedIBFTConfig, err)
@@ -111,6 +113,7 @@ func TestNewForkManager(t *testing.T) {
 				"type":           "PoS",
 				"validator_type": "bls",
 			},
+			false,
 		)
 
 		assert.ErrorIs(t, errTest, err)
@@ -159,6 +162,7 @@ func TestNewForkManager(t *testing.T) {
 				"type":           "PoA",
 				"validator_type": "ecdsa",
 			},
+			false,
 		)
 
 		assert.NoError(t, err)
@@ -240,6 +244,7 @@ func TestNewForkManager(t *testing.T) {
 				"type":           "PoA",
 				"validator_type": "ecdsa",
 			},
+			false,
 		)
 
 		assert.NoError(t, err)
@@ -285,6 +290,7 @@ func TestNewForkManager(t *testing.T) {
 				"type":           "PoS",
 				"validator_type": "bls",
 			},
+			false,
 		)
 
 		assert.NoError(t, err)
@@ -447,7 +453,7 @@ func TestForkManagerGetSigner(t *testing.T) {
 				validators.BLSValidatorType:   blsKeyManager,
 			},
 			height:         1,
-			expectedSigner: signer.NewSigner(ecdsaKeyManager, nil),
+			expectedSigner: signer.NewSigner(ecdsaKeyManager, nil, false),
 		},
 		{
 			name: "should return the signer with different key manager and parent key manager",
@@ -467,7 +473,7 @@ func TestForkManagerGetSigner(t *testing.T) {
 				validators.BLSValidatorType:   blsKeyManager,
 			},
 			height:         11,
-			expectedSigner: signer.NewSigner(blsKeyManager, ecdsaKeyManager),
+			expectedSigner: signer.NewSigner(blsKeyManager, ecdsaKeyManager, false),
 		},
 	}
 

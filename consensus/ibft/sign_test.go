@@ -3,9 +3,10 @@ package ibft
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestSign_Sealer(t *testing.T) {
@@ -21,6 +22,7 @@ func TestSign_Sealer(t *testing.T) {
 	signerA := signer.NewSigner(
 		signer.NewECDSAKeyManagerFromKey(pool.get("A").priv),
 		signer.NewECDSAKeyManagerFromKey(pool.get("A").priv),
+		false,
 	)
 
 	signer.UseIstanbulHeaderHashInTest(t, signerA)
@@ -35,6 +37,7 @@ func TestSign_Sealer(t *testing.T) {
 	signerX := signer.NewSigner(
 		signer.NewECDSAKeyManagerFromKey(pool.get("X").priv),
 		signer.NewECDSAKeyManagerFromKey(pool.get("A").priv),
+		false,
 	)
 
 	badSealedBlock, _ := signerX.WriteProposerSeal(h)
@@ -63,11 +66,12 @@ func TestSign_CommittedSeals(t *testing.T) {
 	signerA := signer.NewSigner(
 		signer.NewECDSAKeyManagerFromKey(pool.get("A").priv),
 		signer.NewECDSAKeyManagerFromKey(pool.get("A").priv),
+		false,
 	)
 
 	signerA.InitIBFTExtra(h, correctValSet, nil)
 
-	h.Hash, err = signerA.CalculateHeaderHash(h)
+	h.Hash, err = signerA.CalculateHeaderHash(h, signer.EncodeEverything)
 	if err != nil {
 		t.Fatalf("Unable to calculate hash, %v", err)
 	}
@@ -88,6 +92,7 @@ func TestSign_CommittedSeals(t *testing.T) {
 				signer.NewECDSAKeyManagerFromKey(
 					acc.priv,
 				),
+				false,
 			)
 
 			seal, err := signer.CreateCommittedSeal(h.Hash.Bytes())

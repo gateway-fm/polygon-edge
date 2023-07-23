@@ -77,6 +77,8 @@ type Blockchain struct {
 	gpAverage *gasPriceAverage // A reference to the average gas price
 
 	writeLock sync.Mutex
+
+	highestKnownBlock atomic.Uint64
 }
 
 // gasPriceAverage keeps track of the average gas price (rolling average)
@@ -255,7 +257,7 @@ func (b *Blockchain) ComputeGenesis() error {
 		}
 
 		// validate that the genesis file in storage matches the chain.Genesis
-		if b.genesis != b.config.Genesis.Hash() {
+		if b.genesis != b.config.Genesis.Hash(b.config.Params.IsPalm()) {
 			return fmt.Errorf("genesis file does not match current genesis")
 		}
 
@@ -285,7 +287,7 @@ func (b *Blockchain) ComputeGenesis() error {
 		}
 	}
 
-	b.logger.Info("genesis", "hash", b.config.Genesis.Hash())
+	b.logger.Info("genesis", "hash", b.config.Genesis.Hash(b.config.Params.IsPalm()))
 
 	return nil
 }
@@ -345,6 +347,10 @@ func (b *Blockchain) Genesis() types.Hash {
 	return b.genesis
 }
 
+func (b *Blockchain) GetTotalDifficulty(hash types.Hash) (*big.Int, bool) {
+	return b.readTotalDifficulty(hash)
+}
+
 // CalculateGasLimit returns the gas limit of the next block after parent
 func (b *Blockchain) CalculateGasLimit(number uint64) (uint64, error) {
 	parent, ok := b.GetHeaderByNumber(number - 1)
@@ -388,7 +394,7 @@ func (b *Blockchain) calculateGasLimit(parentGasLimit uint64) uint64 {
 
 // writeGenesis wrapper for the genesis write function
 func (b *Blockchain) writeGenesis(genesis *chain.Genesis) error {
-	header := genesis.GenesisHeader()
+	header := genesis.GenesisHeader(b.config.Params.IsPalm())
 	header.ComputeHash()
 
 	if err := b.writeGenesisImpl(header); err != nil {
@@ -1403,4 +1409,15 @@ func (b *Blockchain) writeBatchAndUpdate(
 	}
 
 	return nil
+}
+
+func (b *Blockchain) NewBlockNumberAnnounced(number uint64) {
+	current := b.highestKnownBlock.Load()
+	if number > current {
+		b.highestKnownBlock.Store(number)
+	}
+}
+
+func (b *Blockchain) GetHighestKnownNumber() uint64 {
+	return b.highestKnownBlock.Load()
 }

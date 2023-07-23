@@ -3,10 +3,11 @@ package itrie
 import (
 	"bytes"
 
+	"github.com/umbracle/fastrlp"
+
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/umbracle/fastrlp"
 )
 
 type Snapshot struct {

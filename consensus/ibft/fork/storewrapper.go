@@ -5,12 +5,13 @@ import (
 	"errors"
 	"path/filepath"
 
+	"github.com/hashicorp/go-hclog"
+
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/validators"
 	"github.com/0xPolygon/polygon-edge/validators/store"
 	"github.com/0xPolygon/polygon-edge/validators/store/contract"
 	"github.com/0xPolygon/polygon-edge/validators/store/snapshot"
-	"github.com/hashicorp/go-hclog"
 )
 
 // isJSONSyntaxError returns bool indicating the giving error is json.SyntaxError or not
@@ -63,6 +64,7 @@ func NewSnapshotValidatorStoreWrapper(
 	getSigner func(uint64) (signer.Signer, error),
 	dirPath string,
 	epochSize uint64,
+	isPalm bool,
 ) (*SnapshotValidatorStoreWrapper, error) {
 	var (
 		snapshotMetadataPath = filepath.Join(dirPath, snapshotMetadataFilename)
@@ -101,6 +103,7 @@ func NewSnapshotValidatorStoreWrapper(
 		epochSize,
 		snapshotMeta,
 		snapshots,
+		isPalm,
 	)
 
 	if err != nil {

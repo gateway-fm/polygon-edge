@@ -8,6 +8,8 @@ import (
 	"math/big"
 	"os"
 
+	"github.com/umbracle/ethgo/abi"
+
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state"
@@ -15,7 +17,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/umbracle/ethgo/abi"
 )
 
 var (
@@ -135,6 +136,7 @@ func getPredeployAccount(address types.Address, input, deployedBytecode []byte) 
 		big.NewInt(0),
 		math.MaxInt64,
 		input,
+		runtime.NewAccessList(),
 	)
 
 	// Enable all forks

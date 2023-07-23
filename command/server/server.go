@@ -3,12 +3,13 @@ package server
 import (
 	"fmt"
 
+	"github.com/spf13/cobra"
+
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/server/config"
 	"github.com/0xPolygon/polygon-edge/command/server/export"
 	"github.com/0xPolygon/polygon-edge/server"
-	"github.com/spf13/cobra"
 )
 
 func GetCommand() *cobra.Command {
@@ -72,6 +73,26 @@ func setFlags(cmd *cobra.Command) {
 		libp2pAddressFlag,
 		defaultConfig.Network.Libp2pAddr,
 		"the address and port for the libp2p service",
+	)
+
+	cmd.Flags().StringVar(
+		&params.rawConfig.Network.Devp2pAddr,
+		devp2pAddressFlag,
+		defaultConfig.Network.Devp2pAddr,
+		"the address and port for the devp2p service",
+	)
+
+	cmd.Flags().Uint64Var(
+		&params.rawConfig.Network.Devp2pSyncTo,
+		devp2pSyncTo,
+		0,
+		"to use devp2p whilst syncing up to a certain block height, libp2p will be used beyond here",
+	)
+	cmd.Flags().StringVar(
+		&params.rawConfig.Network.Devp2pPeers,
+		devp2ppeers,
+		"",
+		"static nodes to join on the devp2p network",
 	)
 
 	cmd.Flags().StringVar(

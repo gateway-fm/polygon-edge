@@ -1,13 +1,16 @@
 package signer
 
 import (
+	"encoding/hex"
 	"encoding/json"
 	"math/big"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/umbracle/fastrlp"
+
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
-	"github.com/stretchr/testify/assert"
 )
 
 func JSONMarshalHelper(t *testing.T, extra *IstanbulExtra) string {
@@ -104,7 +107,7 @@ func TestIstanbulExtraMarshalAndUnmarshal(t *testing.T) {
 			// create original data
 			originalExtraJSON := JSONMarshalHelper(t, test.extra)
 
-			bytesData := test.extra.MarshalRLPTo(nil)
+			bytesData := test.extra.MarshalRLPTo(nil, EncodeEverything)
 			err := test.extra.UnmarshalRLP(bytesData)
 			assert.NoError(t, err)
 
@@ -210,7 +213,7 @@ func Test_packProposerSealIntoExtra(t *testing.T) {
 				// prepend IstanbulExtraHeader to parse
 				append(
 					make([]byte, IstanbulExtraVanity),
-					test.extra.MarshalRLPTo(nil)...,
+					test.extra.MarshalRLPTo(nil, EncodeEverything)...,
 				),
 				newProposerSeal,
 			)
@@ -345,7 +348,7 @@ func Test_packCommittedSealsAndRoundNumberIntoExtra(t *testing.T) {
 				// prepend IstanbulExtraHeader
 				append(
 					make([]byte, IstanbulExtraVanity),
-					test.extra.MarshalRLPTo(nil)...,
+					test.extra.MarshalRLPTo(nil, EncodeEverything)...,
 				),
 				test.newCommittedSeals,
 				test.roundNumber,
@@ -425,7 +428,7 @@ func Test_unmarshalRLPForParentCS(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			bytesData := test.extra.MarshalRLPTo(nil)
+			bytesData := test.extra.MarshalRLPTo(nil, EncodeEverything)
 
 			assert.NoError(t, test.targetExtra.unmarshalRLPForParentCS(bytesData))
 
@@ -495,10 +498,10 @@ func Test_putIbftExtra(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			putIbftExtra(test.header, test.extra)
+			putIbftExtra(test.header, test.extra, EncodeEverything)
 
 			expectedExtraHeader := make([]byte, IstanbulExtraVanity)
-			expectedExtraBody := test.extra.MarshalRLPTo(nil)
+			expectedExtraBody := test.extra.MarshalRLPTo(nil, EncodeEverything)
 			expectedExtra := append(expectedExtraHeader, expectedExtraBody...) //nolint:makezero
 
 			assert.Equal(
@@ -508,4 +511,21 @@ func Test_putIbftExtra(t *testing.T) {
 			)
 		})
 	}
+}
+
+func Test_HexUnmarshallsForPalm(t *testing.T) {
+	rlpHex := "f901b6a00000000000000000000000000000000000000000000000000000000000000000f87e9411781ba3cd85671a6f8481514f84bce660b75919944324df543421b7b3dc29a59fcd2416aa9a4f4717947f9a67f84a010bda3d83493e4f1476f2651b1dab9488cd6a0d883f9104432d729df772131efe44b82094948b655e3a1e3505c57d15f2c5c813e4abad9cb494b49ce87bcb7f8a1dde59bde1b4c18fbf00b424ac808400000000f9010cb8412d7b64bec5c8a17ec70a878625ca37676733cd3ac65a37118571e7df7c4119ca3245537ec3082f46ce04621b2c8c76b4fff6400db3377f65bd7529adae55e89201b841619764d2c72b75c054eba9beb351649633cf3306e39d94c36ca4c2a1de862ba76466b3f06a6fdfde842db54042dca4c4829d5e3537dbb0070f653dd1b3e7e30501b841f310494c49981c2249fdbb8f18ea680f9c74737c64fc663936a26105a9f2cc25567d2f42478c308ded9405f6253ccb894a037afa41e8209c5b920e2245a7f40101b841347b7b0a0bad02f72bcfcec9d4d3b552d326a6c111f8040082ea6297f256143c37b06d4e51be1780e3134c4cdcc374abf3018840ff6ee8c0ba08d5f8886d39ab00"
+	bytes, err := hex.DecodeString(rlpHex)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	pr := fastrlp.DefaultParserPool.Get()
+
+	v, err := pr.Parse(bytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	assert.Equal(t, 5, v.Elems())
 }

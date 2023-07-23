@@ -6,11 +6,12 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/0xPolygon/polygon-edge/crypto"
 	testHelper "github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
-	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -103,7 +104,7 @@ func getTestExtraBytes(
 
 	return append(
 		make([]byte, IstanbulExtraVanity),
-		extra.MarshalRLPTo(nil)...,
+		extra.MarshalRLPTo(nil, EncodeEverything)...,
 	)
 }
 
@@ -113,7 +114,7 @@ func TestNewKeyManager(t *testing.T) {
 	keyManager := &MockKeyManager{}
 	parentKeyManager := &MockKeyManager{}
 
-	signer := NewSigner(keyManager, parentKeyManager)
+	signer := NewSigner(keyManager, parentKeyManager, false)
 
 	assert.Same(
 		t,
@@ -209,6 +210,7 @@ func TestSignerInitIBFTExtra(t *testing.T) {
 				header,
 				test.validators,
 				test.parentCommittedSeals,
+				Vote{},
 			)
 
 			expectedExtraBytes := getTestExtraBytes(
@@ -241,7 +243,7 @@ func TestSignerGetIBFTExtra(t *testing.T) {
 			header: &types.Header{
 				ExtraData: []byte{},
 			},
-			signer:        NewSigner(nil, nil),
+			signer:        NewSigner(nil, nil, false),
 			expectedExtra: nil,
 			expectedErr: fmt.Errorf(
 				"wrong extra size, expected greater than or equal to %d but actual %d",
@@ -271,6 +273,7 @@ func TestSignerGetIBFTExtra(t *testing.T) {
 					},
 				},
 				nil,
+				false,
 			),
 			expectedExtra: &IstanbulExtra{
 				Validators:           ecdsaValidators,
@@ -302,6 +305,7 @@ func TestSignerGetIBFTExtra(t *testing.T) {
 					},
 				},
 				nil,
+				false,
 			),
 			expectedExtra: &IstanbulExtra{
 				Validators:           blsValidators,
@@ -337,6 +341,7 @@ func TestSignerGetIBFTExtra(t *testing.T) {
 						return &SerializedSeal{}
 					},
 				},
+				false,
 			),
 			expectedExtra: &IstanbulExtra{
 				Validators:           ecdsaValidators,
@@ -372,6 +377,7 @@ func TestSignerGetIBFTExtra(t *testing.T) {
 						return &AggregatedSeal{}
 					},
 				},
+				false,
 			),
 			expectedExtra: &IstanbulExtra{
 				Validators:           blsValidators,
@@ -407,6 +413,7 @@ func TestSignerGetIBFTExtra(t *testing.T) {
 						return &SerializedSeal{}
 					},
 				},
+				false,
 			),
 			expectedExtra: &IstanbulExtra{
 				Validators:           blsValidators,
@@ -442,6 +449,7 @@ func TestSignerGetIBFTExtra(t *testing.T) {
 						return &AggregatedSeal{}
 					},
 				},
+				false,
 			),
 			expectedExtra: &IstanbulExtra{
 				Validators:           ecdsaValidators,
@@ -495,6 +503,7 @@ func TestSignerWriteProposerSeal(t *testing.T) {
 					},
 				},
 				nil,
+				false,
 			),
 			expectedHeader: nil,
 			expectedErr: fmt.Errorf(
@@ -528,6 +537,7 @@ func TestSignerWriteProposerSeal(t *testing.T) {
 					},
 				},
 				nil,
+				false,
 			),
 			expectedHeader: nil,
 			expectedErr:    errTest,
@@ -557,6 +567,7 @@ func TestSignerWriteProposerSeal(t *testing.T) {
 					},
 				},
 				nil,
+				false,
 			),
 			expectedHeader: &types.Header{
 				Number: 1,
@@ -617,6 +628,7 @@ func TestSignerEcrecoverFromHeader(t *testing.T) {
 					},
 				},
 				nil,
+				false,
 			),
 			expectedAddr: types.ZeroAddress,
 			expectedErr: fmt.Errorf(
@@ -650,6 +662,7 @@ func TestSignerEcrecoverFromHeader(t *testing.T) {
 					},
 				},
 				nil,
+				false,
 			),
 			expectedAddr: ecdsaValidator1.Address,
 			expectedErr:  nil,

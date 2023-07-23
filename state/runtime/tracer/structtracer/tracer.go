@@ -18,6 +18,7 @@ type Config struct {
 	EnableStack      bool // enable stack capture
 	EnableStorage    bool // enable storage capture
 	EnableReturnData bool // enable return data capture
+	Legacy           bool // legacy mode
 }
 
 type StructLog struct {
@@ -33,6 +34,16 @@ type StructLog struct {
 	Depth         int                       `json:"depth"`
 	RefundCounter uint64                    `json:"refund"`
 	Err           error                     `json:"err"`
+	Reason        *string                   `json:"reason"`
+}
+
+type callFrame struct {
+	depth      int
+	callType   int
+	gas        uint64
+	callFrames []*callFrame
+	logs       []StructLog
+	index      int
 }
 
 func (l *StructLog) ErrorString() string {
@@ -59,6 +70,8 @@ type StructTracer struct {
 	storage       []map[types.Address]map[types.Hash]types.Hash
 	currentMemory []([]byte)
 	currentStack  []([]*big.Int)
+	callStack     []*callFrame
+	justExited    bool
 }
 
 func NewStructTracer(config Config) *StructTracer {
@@ -71,6 +84,7 @@ func NewStructTracer(config Config) *StructTracer {
 		storage:       storage,
 		currentMemory: make([]([]byte), 1),
 		currentStack:  make([]([]*big.Int), 1),
+		callStack:     []*callFrame{},
 	}
 }
 
@@ -119,6 +133,15 @@ func (t *StructTracer) CallStart(
 	value *big.Int,
 	input []byte,
 ) {
+	frame := &callFrame{
+		depth:      depth,
+		callType:   callType,
+		gas:        gas,
+		callFrames: []*callFrame{},
+		logs:       []StructLog{},
+	}
+
+	t.callStack = append(t.callStack, frame)
 }
 
 func (t *StructTracer) CallEnd(
@@ -126,9 +149,12 @@ func (t *StructTracer) CallEnd(
 	output []byte,
 	err error,
 ) {
+
 	if depth == 1 {
 		t.output = output
 		t.err = err
+	} else {
+		t.justExited = true
 	}
 }
 
@@ -316,23 +342,47 @@ func (t *StructTracer) ExecuteState(
 		}
 	}
 
-	t.logs = append(
-		t.logs,
-		StructLog{
-			Pc:            ip,
-			Op:            opCode,
-			Gas:           availableGas,
-			GasCost:       cost,
-			Memory:        memory,
-			MemorySize:    memorySize,
-			Stack:         stack,
-			ReturnData:    returnData,
-			Storage:       storage,
-			Depth:         depth,
-			RefundCounter: host.GetRefund(),
-			Err:           err,
-		},
-	)
+	log := StructLog{
+		Pc:            ip,
+		Op:            opCode,
+		Gas:           availableGas,
+		GasCost:       cost,
+		Memory:        memory,
+		MemorySize:    memorySize,
+		Stack:         stack,
+		ReturnData:    returnData,
+		Storage:       storage,
+		Depth:         depth,
+		RefundCounter: host.GetRefund(),
+		Err:           err,
+	}
+
+	t.logs = append(t.logs, log)
+
+	// we've got the log from the final instruction of the contract just exited so keep hold of it
+	// and prepend it to the logs of the calling contract before re-organizing the stack
+	if t.justExited {
+		t.justExited = false
+
+		size := len(t.callStack)
+		if size <= 1 {
+			return
+		}
+
+		call := t.callStack[size-1]
+		parentCall := t.callStack[size-2]
+		call.index = len(parentCall.logs)
+
+		call.logs = append([]StructLog{log}, call.logs...)
+
+		t.callStack = t.callStack[:size-1]
+		size -= 1
+
+		//call.gasUsed = gasUsed
+		t.callStack[size-1].callFrames = append(t.callStack[size-1].callFrames, call)
+	} else {
+		t.callStack[len(t.callStack)-1].logs = append(t.callStack[len(t.callStack)-1].logs, log)
+	}
 }
 
 type StructTraceResult struct {
@@ -372,11 +422,11 @@ func (t *StructTracer) GetResult() (interface{}, error) {
 		Failed:      t.err != nil,
 		Gas:         t.consumedGas,
 		ReturnValue: returnValue,
-		StructLogs:  formatStructLogs(t.logs),
+		StructLogs:  formatStructLogs(t.logs, t.Config),
 	}, nil
 }
 
-func formatStructLogs(originalLogs []StructLog) []StructLogRes {
+func formatStructLogs(originalLogs []StructLog, config Config) []StructLogRes {
 	res := make([]StructLogRes, len(originalLogs))
 
 	for index, log := range originalLogs {
@@ -393,7 +443,11 @@ func formatStructLogs(originalLogs []StructLog) []StructLogRes {
 		res[index].Stack = make([]string, len(log.Stack))
 
 		for i, value := range log.Stack {
-			res[index].Stack[i] = hex.EncodeBig(value)
+			if config.Legacy {
+				res[index].Stack[i] = hex.EncodeBigLegacy(value)
+			} else {
+				res[index].Stack[i] = hex.EncodeBig(value)
+			}
 		}
 
 		res[index].Memory = make([]string, 0, (len(log.Memory)+31)/32)
@@ -415,4 +469,36 @@ func formatStructLogs(originalLogs []StructLog) []StructLogRes {
 	}
 
 	return res
+}
+
+func (t *StructTracer) GetLogsCsv() string {
+	var output string
+
+	for _, frame := range t.callStack {
+		output += appendLogs(frame)
+	}
+
+	return output
+}
+
+func appendLogs(frame *callFrame) string {
+	var out string
+	for idx, l := range frame.logs {
+		if l.Depth > 1 {
+			out += fmt.Sprintf("%v,%s,%v\n", l.Pc, l.Op, l.GasCost)
+		}
+
+		// check if a sub call happened in any of the child frames
+		for _, call := range frame.callFrames {
+			if call.index == idx {
+				out += appendLogs(call)
+			}
+		}
+
+		if l.Depth == 1 {
+			out += fmt.Sprintf("%v,%s,%v\n", l.Pc, l.Op, l.GasCost)
+		}
+	}
+
+	return out
 }

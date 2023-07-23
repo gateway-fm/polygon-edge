@@ -3,6 +3,8 @@ package fork
 import (
 	"errors"
 
+	"github.com/hashicorp/go-hclog"
+
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/hook"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/signer"
 	"github.com/0xPolygon/polygon-edge/secrets"
@@ -11,7 +13,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/validators"
 	"github.com/0xPolygon/polygon-edge/validators/store"
 	"github.com/0xPolygon/polygon-edge/validators/store/contract"
-	"github.com/hashicorp/go-hclog"
 )
 
 const (
@@ -71,6 +72,8 @@ type ForkManager struct {
 	keyManagers     map[validators.ValidatorType]signer.KeyManager
 	validatorStores map[store.SourceType]ValidatorStore
 	hooksRegisters  map[IBFTType]HooksRegister
+
+	isPalm bool
 }
 
 // NewForkManager is a constructor of ForkManager
@@ -82,6 +85,7 @@ func NewForkManager(
 	filePath string,
 	epochSize uint64,
 	ibftConfig map[string]interface{},
+	isPalm bool,
 ) (*ForkManager, error) {
 	forks, err := GetIBFTForks(ibftConfig)
 	if err != nil {
@@ -99,6 +103,7 @@ func NewForkManager(
 		keyManagers:     make(map[validators.ValidatorType]signer.KeyManager),
 		validatorStores: make(map[store.SourceType]ValidatorStore),
 		hooksRegisters:  make(map[IBFTType]HooksRegister),
+		isPalm:          isPalm,
 	}
 
 	// Need initialization of signers in the constructor
@@ -150,6 +155,7 @@ func (m *ForkManager) GetSigner(height uint64) (signer.Signer, error) {
 	return signer.NewSigner(
 		keyManager,
 		parentKeyManager,
+		m.isPalm,
 	), nil
 }
 
@@ -279,6 +285,7 @@ func (m *ForkManager) initializeValidatorStore(setType store.SourceType) error {
 			m.GetSigner,
 			m.filePath,
 			m.epochSize,
+			m.isPalm,
 		)
 	case store.Contract:
 		valStore, err = NewContractValidatorStoreWrapper(

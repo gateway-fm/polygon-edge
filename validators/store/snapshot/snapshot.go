@@ -6,10 +6,11 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/hashicorp/go-hclog"
+
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
 	"github.com/0xPolygon/polygon-edge/validators/store"
-	"github.com/hashicorp/go-hclog"
 )
 
 const (
@@ -42,6 +43,7 @@ var (
 	ErrCandidateNotExistInSet       = errors.New("cannot remove a validator if they're not in the snapshot")
 	ErrAlreadyVoted                 = errors.New("already voted for this address")
 	ErrMultipleVotesBySameValidator = errors.New("more than one proposal per validator per address found")
+	ErrIncorrectExtraData           = errors.New("incorrect extra data")
 )
 
 type SnapshotValidatorStore struct {
@@ -57,6 +59,8 @@ type SnapshotValidatorStore struct {
 	store          *snapshotStore
 	candidates     []*store.Candidate
 	candidatesLock sync.RWMutex
+
+	isPalm bool
 }
 
 // NewSnapshotValidatorStore creates and initializes *SnapshotValidatorStore
@@ -67,6 +71,7 @@ func NewSnapshotValidatorStore(
 	epochSize uint64,
 	metadata *SnapshotMetadata,
 	snapshots []*Snapshot,
+	isPalm bool,
 ) (*SnapshotValidatorStore, error) {
 	set := &SnapshotValidatorStore{
 		logger:         logger.Named(loggerName),
@@ -76,6 +81,7 @@ func NewSnapshotValidatorStore(
 		candidates:     make([]*store.Candidate, 0),
 		candidatesLock: sync.RWMutex{},
 		epochSize:      epochSize,
+		isPalm:         isPalm,
 	}
 
 	if err := set.initialize(); err != nil {
@@ -316,7 +322,7 @@ func (s *SnapshotValidatorStore) ProcessHeader(
 	}
 
 	// Process votes in the middle of epoch
-	if err := processVote(snap, header, signer.Type(), proposer); err != nil {
+	if err := processVote(snap, header, signer.Type(), proposer, s.isPalm); err != nil {
 		return err
 	}
 
@@ -537,18 +543,20 @@ func processVote(
 	header *types.Header,
 	candidateType validators.ValidatorType,
 	proposer types.Address,
+	isPalm bool,
 ) error {
 	// the nonce selects the action
-	authorize, err := isAuthorize(header.Nonce)
+	authorizeResult, candidate, err := isAuthorize(header, candidateType, isPalm)
 	if err != nil {
 		return err
 	}
 
-	// parse candidate validator set from header.Miner
-	candidate, err := minerToValidator(candidateType, header.Miner)
-	if err != nil {
-		return err
+	// Palm network may have no vote in the header in which case do nothing
+	if authorizeResult == InconclusiveAuthorize {
+		return nil
 	}
+
+	authorize := authorizeResult == YesAuthorize
 
 	// if candidate has been processed as expected, just update last block
 	if !shouldProcessVote(snapshot.Set, candidate.Addr(), authorize) {
@@ -608,7 +616,7 @@ func validatorToMiner(validator validators.Validator) ([]byte, error) {
 // minerToValidator converts bytes to validator for miner field in header
 func minerToValidator(
 	validatorType validators.ValidatorType,
-	miner []byte,
+	address []byte,
 ) (validators.Validator, error) {
 	validator, err := validators.NewValidatorFromType(validatorType)
 	if err != nil {
@@ -617,9 +625,9 @@ func minerToValidator(
 
 	switch typedVal := validator.(type) {
 	case *validators.ECDSAValidator:
-		typedVal.Address = types.BytesToAddress(miner)
+		typedVal.Address = types.BytesToAddress(address)
 	case *validators.BLSValidator:
-		if err := typedVal.SetFromBytes(miner); err != nil {
+		if err := typedVal.SetFromBytes(address); err != nil {
 			return nil, err
 		}
 	default:

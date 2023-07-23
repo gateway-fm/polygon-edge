@@ -62,7 +62,7 @@ type Genesis struct {
 }
 
 // GenesisHeader converts the initially defined genesis struct to a header
-func (g *Genesis) GenesisHeader() *types.Header {
+func (g *Genesis) GenesisHeader(isPalm bool) *types.Header {
 	stateRoot := types.EmptyRootHash
 
 	if g.StateRoot != types.ZeroHash {
@@ -96,16 +96,18 @@ func (g *Genesis) GenesisHeader() *types.Header {
 		head.Difficulty = GenesisDifficulty
 	}
 
-	if g.BaseFee == 0 {
-		head.BaseFee = GenesisBaseFee
+	if !isPalm {
+		if g.BaseFee == 0 {
+			head.BaseFee = GenesisBaseFee
+		}
 	}
 
 	return head
 }
 
 // Hash computes the genesis hash
-func (g *Genesis) Hash() types.Hash {
-	header := g.GenesisHeader()
+func (g *Genesis) Hash(isPalm bool) types.Hash {
+	header := g.GenesisHeader(isPalm)
 	header.ComputeHash()
 
 	return header.Hash

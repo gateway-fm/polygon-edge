@@ -196,6 +196,7 @@ type Contract struct {
 	Input       []byte
 	Gas         uint64
 	Static      bool
+	AccessList  *AccessList
 }
 
 func NewContract(
@@ -206,8 +207,9 @@ func NewContract(
 	value *big.Int,
 	gas uint64,
 	code []byte,
+	accessList *AccessList,
 ) *Contract {
-	f := &Contract{
+	return &Contract{
 		Caller:      from,
 		Origin:      origin,
 		CodeAddress: to,
@@ -216,9 +218,8 @@ func NewContract(
 		Value:       value,
 		Code:        code,
 		Depth:       depth,
+		AccessList:  accessList,
 	}
-
-	return f
 }
 
 func NewContractCreation(
@@ -229,8 +230,13 @@ func NewContractCreation(
 	value *big.Int,
 	gas uint64,
 	code []byte,
+	accessList *AccessList,
 ) *Contract {
-	c := NewContract(depth, origin, from, to, value, gas, code)
+	if accessList != nil {
+		accessList.AddAddress(origin)
+		accessList.AddAddress(to) // the address of the account being created
+	}
+	c := NewContract(depth, origin, from, to, value, gas, code, accessList)
 
 	return c
 }
@@ -244,8 +250,13 @@ func NewContractCall(
 	gas uint64,
 	code []byte,
 	input []byte,
+	accessList *AccessList,
 ) *Contract {
-	c := NewContract(depth, origin, from, to, value, gas, code)
+	if accessList != nil {
+		accessList.AddAddress(origin)
+		accessList.AddAddress(to)
+	}
+	c := NewContract(depth, origin, from, to, value, gas, code, accessList)
 	c.Input = input
 
 	return c

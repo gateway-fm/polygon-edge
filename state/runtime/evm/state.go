@@ -4,7 +4,6 @@ import (
 	"errors"
 	"math/big"
 	"strings"
-
 	"sync"
 
 	"github.com/0xPolygon/polygon-edge/chain"
@@ -79,6 +78,8 @@ type state struct {
 
 	returnData []byte
 	ret        []byte
+
+	accessList *runtime.AccessList
 }
 
 func (c *state) reset() {
@@ -268,6 +269,9 @@ func (c *state) Run() ([]byte, error) {
 
 			break
 		}
+
+		gasUsed := gasCopy - c.gas
+		_ = gasUsed
 
 		c.ip++
 	}

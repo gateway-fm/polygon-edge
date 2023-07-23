@@ -7,13 +7,14 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/hashicorp/go-hclog"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/0xPolygon/polygon-edge/crypto"
 	testHelper "github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
 	"github.com/0xPolygon/polygon-edge/validators/store"
-	"github.com/hashicorp/go-hclog"
-	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -132,6 +133,7 @@ func TestNewSnapshotValidatorStore(t *testing.T) {
 			epochSize,
 			metadata,
 			snapshots,
+			false,
 		)
 
 		assert.Nil(
@@ -169,6 +171,7 @@ func TestNewSnapshotValidatorStore(t *testing.T) {
 			epochSize,
 			metadata,
 			snapshots,
+			false,
 		)
 
 		assert.Equal(
@@ -2685,6 +2688,7 @@ func TestSnapshotValidatorStore_processVote(t *testing.T) {
 					test.header,
 					test.candidateType,
 					test.proposer,
+					false,
 				),
 			)
 
@@ -2786,7 +2790,7 @@ func Test_minerToValidator(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			res, err := minerToValidator(test.validatorType, test.miner)
+			res, err := minerToValidator(test.validatorType, test.miner, false)
 
 			assert.Equal(
 				t,
