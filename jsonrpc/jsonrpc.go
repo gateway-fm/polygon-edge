@@ -9,9 +9,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/versioning"
 	"github.com/gorilla/websocket"
 	"github.com/hashicorp/go-hclog"
+
+	"github.com/0xPolygon/polygon-edge/versioning"
 )
 
 type serverType int
@@ -40,6 +41,7 @@ type JSONRPC struct {
 	logger     hclog.Logger
 	config     *Config
 	dispatcher dispatcher
+	stopChan   chan struct{}
 }
 
 type dispatcher interface {
@@ -126,13 +128,29 @@ func (j *JSONRPC) setupHTTP() error {
 		ReadHeaderTimeout: 60 * time.Second,
 	}
 
+	j.stopChan = make(chan struct{})
+
 	go func() {
 		if err := srv.Serve(lis); err != nil {
 			j.logger.Error("closed http connection", "err", err)
 		}
 	}()
 
+	go func() {
+		select {
+		case <-j.stopChan:
+			err := srv.Close()
+			if err != nil {
+				j.logger.Error("unable to close http connection", "err", err)
+			}
+		}
+	}()
+
 	return nil
+}
+
+func (j *JSONRPC) Stop() {
+	close(j.stopChan)
 }
 
 // The middlewareFactory builds a middleware which enables CORS using the provided config.

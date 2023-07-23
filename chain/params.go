@@ -19,6 +19,7 @@ type Params struct {
 	ChainID        int64                  `json:"chainID"`
 	Engine         map[string]interface{} `json:"engine"`
 	BlockGasTarget uint64                 `json:"blockGasTarget"`
+	EngineForks    []EngineFork           `json:"engineForks"`
 
 	// Access control configuration
 	ContractDeployerAllowList *AddressListConfig `json:"contractDeployerAllowList,omitempty"`
@@ -101,6 +102,11 @@ const (
 
 // Forks is map which contains all forks and their starting blocks from genesis
 type Forks map[string]Fork
+
+type EngineFork struct {
+	Engine string `json:"engine"`
+	To     uint64 `json:"to"`
+}
 
 // IsActive returns true if fork defined by name exists and defined for the block
 func (f *Forks) IsActive(name string, block uint64) bool {

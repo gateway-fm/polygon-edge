@@ -329,10 +329,15 @@ func runServerLoop(
 	config *server.Config,
 	outputter command.OutputFormatter,
 ) error {
-	serverInstance, err := server.NewServer(config)
+	manager, err := server.NewManager(config)
 	if err != nil {
 		return err
 	}
 
-	return helper.HandleSignals(serverInstance.Close, outputter)
+	err = manager.Start()
+	if err != nil {
+		return err
+	}
+
+	return helper.HandleSignals(manager.Close, outputter)
 }

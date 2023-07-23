@@ -95,6 +95,8 @@ type Server struct {
 
 	// gasHelper is providing functions regarding gas and fees
 	gasHelper *gasprice.GasHelper
+
+	db storage.Storage
 }
 
 // newFileLogger returns logger instance that writes all logs to a specified file.
@@ -138,6 +140,36 @@ func newLoggerFromConfig(config *Config) (hclog.Logger, error) {
 	return newCLILogger(config), nil
 }
 
+func NewManagedServer(
+	config *Config,
+	logger hclog.Logger,
+	prometheusServer *http.Server,
+	secretsManager secrets.SecretsManager,
+	network *network.Server,
+	stateStorage itrie.Storage,
+	st *itrie.State,
+	db storage.Storage,
+	grpcServer *grpc.Server,
+) (*Server, error) {
+	m := &Server{
+		config:           config,
+		logger:           logger,
+		prometheusServer: prometheusServer,
+		secretsManager:   secretsManager,
+		network:          network,
+		stateStorage:     stateStorage,
+		state:            st,
+		db:               db,
+		grpcServer:       grpcServer,
+	}
+
+	m.executor = state.NewExecutor(config.Chain.Params, st, logger)
+
+	engineName := m.config.Chain.Params.GetEngine()
+	m.engineChecks(engineName)
+	return m.buildAndRun(engineName)
+}
+
 // NewServer creates a new Minimal server, using the passed in configuration
 func NewServer(config *Config) (*Server, error) {
 	logger, err := newLoggerFromConfig(config)
@@ -155,11 +187,6 @@ func NewServer(config *Config) (*Server, error) {
 
 	m.logger.Info("Data dir", "path", config.DataDir)
 
-	var dirPaths = []string{
-		"blockchain",
-		"trie",
-	}
-
 	// Generate all the paths in the dataDir
 	if err := common.SetupDataDir(config.DataDir, dirPaths, 0770); err != nil {
 		return nil, fmt.Errorf("failed to create data directories: %w", err)
@@ -167,22 +194,24 @@ func NewServer(config *Config) (*Server, error) {
 
 	if config.Telemetry.PrometheusAddr != nil {
 		// Only setup telemetry if `PrometheusAddr` has been configured.
-		if err := m.setupTelemetry(); err != nil {
+		if err := setupTelemetry(); err != nil {
 			return nil, err
 		}
 
-		m.prometheusServer = m.startPrometheusServer(config.Telemetry.PrometheusAddr)
+		m.prometheusServer = startPrometheusServer(config.Telemetry.PrometheusAddr, m.logger)
 	}
 
 	// Set up datadog profiler
-	if ddErr := m.enableDataDogProfiler(); err != nil {
+	if ddErr := enableDataDogProfiler(m.logger); err != nil {
 		m.logger.Error("DataDog profiler setup failed", "err", ddErr.Error())
 	}
 
 	// Set up the secrets manager
-	if err := m.setupSecretsManager(); err != nil {
+	secretsManager, err := setupSecretsManager(config, m.logger)
+	if err != nil {
 		return nil, fmt.Errorf("failed to set up the secrets manager: %w", err)
 	}
+	m.secretsManager = secretsManager
 
 	// start libp2p
 	{
@@ -203,16 +232,42 @@ func NewServer(config *Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-
 	m.stateStorage = stateStorage
 
 	st := itrie.NewState(stateStorage)
 	m.state = st
 
+	// create storage instance for blockchain
+	var db storage.Storage
+	{
+		if m.config.DataDir == "" {
+			db, err = memory.NewMemoryStorage(nil)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			db, err = leveldb.NewLevelDBStorage(
+				filepath.Join(m.config.DataDir, "blockchain"),
+				m.logger,
+			)
+			if err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	m.db = db
+
 	m.executor = state.NewExecutor(config.Chain.Params, st, logger)
 
-	// custom write genesis hook per consensus engine
 	engineName := m.config.Chain.Params.GetEngine()
+	m.engineChecks(engineName)
+
+	return m.buildAndRun(engineName)
+}
+
+func (m *Server) engineChecks(engineName string) {
+	// custom write genesis hook per consensus engine
 	if factory, exists := genesisCreationFactory[ConsensusType(engineName)]; exists {
 		m.executor.GenesisPostHook = factory(m.config.Chain, engineName)
 	}
@@ -252,17 +307,19 @@ func NewServer(config *Config) (*Server, error) {
 		addresslist.ApplyGenesisAllocs(m.config.Chain.Genesis, contracts.BlockListBridgeAddr,
 			m.config.Chain.Params.BridgeBlockList)
 	}
+}
 
+func (m *Server) buildAndRun(engineName string) (*Server, error) {
 	var initialStateRoot = types.ZeroHash
 
 	if ConsensusType(engineName) == PolyBFTConsensus {
-		polyBFTConfig, err := consensusPolyBFT.GetPolyBFTConfig(config.Chain)
+		polyBFTConfig, err := consensusPolyBFT.GetPolyBFTConfig(m.config.Chain)
 		if err != nil {
 			return nil, err
 		}
 
 		if polyBFTConfig.InitialTrieRoot != types.ZeroHash {
-			checkedInitialTrieRoot, err := itrie.HashChecker(polyBFTConfig.InitialTrieRoot.Bytes(), stateStorage)
+			checkedInitialTrieRoot, err := itrie.HashChecker(polyBFTConfig.InitialTrieRoot.Bytes(), m.stateStorage)
 			if err != nil {
 				return nil, fmt.Errorf("error on state root verification %w", err)
 			}
@@ -271,58 +328,39 @@ func NewServer(config *Config) (*Server, error) {
 				return nil, errors.New("invalid initial state root")
 			}
 
-			logger.Info("Initial state root checked and correct")
+			m.logger.Info("Initial state root checked and correct")
 
 			initialStateRoot = polyBFTConfig.InitialTrieRoot
 		}
 	}
 
-	genesisRoot, err := m.executor.WriteGenesis(config.Chain.Genesis.Alloc, initialStateRoot)
+	genesisRoot, err := m.executor.WriteGenesis(m.config.Chain.Genesis.Alloc, initialStateRoot)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := initForkManager(engineName, config.Chain); err != nil {
+	if err := initForkManager(engineName, m.config.Chain); err != nil {
 		return nil, err
 	}
 
 	// compute the genesis root state
-	config.Chain.Genesis.StateRoot = genesisRoot
+	m.config.Chain.Genesis.StateRoot = genesisRoot
 
 	// Use the london signer with eip-155 as a fallback one
 	var signer crypto.TxSigner = crypto.NewLondonSigner(
 		uint64(m.config.Chain.Params.ChainID),
-		config.Chain.Params.Forks.IsActive(chain.Homestead, 0),
+		m.config.Chain.Params.Forks.IsActive(chain.Homestead, 0),
 		crypto.NewEIP155Signer(
 			uint64(m.config.Chain.Params.ChainID),
-			config.Chain.Params.Forks.IsActive(chain.Homestead, 0),
+			m.config.Chain.Params.Forks.IsActive(chain.Homestead, 0),
 		),
 	)
 
-	// create storage instance for blockchain
-	var db storage.Storage
-	{
-		if m.config.DataDir == "" {
-			db, err = memory.NewMemoryStorage(nil)
-			if err != nil {
-				return nil, err
-			}
-		} else {
-			db, err = leveldb.NewLevelDBStorage(
-				filepath.Join(m.config.DataDir, "blockchain"),
-				m.logger,
-			)
-			if err != nil {
-				return nil, err
-			}
-		}
-	}
-
 	// blockchain object
 	m.blockchain, err = blockchain.NewBlockchain(
-		logger,
-		db,
-		config.Chain,
+		m.logger,
+		m.db,
+		m.config.Chain,
 		nil,
 		m.executor,
 		signer,
@@ -347,8 +385,8 @@ func NewServer(config *Config) (*Server, error) {
 
 		// start transaction pool
 		m.txpool, err = txpool.NewTxPool(
-			logger,
-			m.chain.Params.Forks.At(0),
+			m.logger,
+			m.config.Chain.Params.Forks.At(0),
 			hub,
 			m.grpcServer,
 			m.network,
@@ -405,13 +443,12 @@ func NewServer(config *Config) (*Server, error) {
 		return nil, err
 	}
 
-	// start consensus
 	if err := m.consensus.Start(); err != nil {
 		return nil, err
 	}
 
 	// start relayer
-	if config.Relayer {
+	if m.config.Relayer {
 		if err := m.setupRelayer(); err != nil {
 			return nil, err
 		}
@@ -497,8 +534,8 @@ func (t *txpoolHub) GetBalance(root types.Hash, addr types.Address) (*big.Int, e
 }
 
 // setupSecretsManager sets up the secrets manager
-func (s *Server) setupSecretsManager() error {
-	secretsManagerConfig := s.config.SecretsManager
+func setupSecretsManager(config *Config, logger hclog.Logger) (secrets.SecretsManager, error) {
+	secretsManagerConfig := config.SecretsManager
 	if secretsManagerConfig == nil {
 		// No config provided, use default
 		secretsManagerConfig = &secrets.SecretsManagerConfig{
@@ -508,21 +545,21 @@ func (s *Server) setupSecretsManager() error {
 
 	secretsManagerType := secretsManagerConfig.Type
 	secretsManagerParams := &secrets.SecretsManagerParams{
-		Logger: s.logger,
+		Logger: logger,
 	}
 
 	if secretsManagerType == secrets.Local {
 		// Only the base directory is required for
 		// the local secrets manager
 		secretsManagerParams.Extra = map[string]interface{}{
-			secrets.Path: s.config.DataDir,
+			secrets.Path: config.DataDir,
 		}
 	}
 
 	// Grab the factory method
 	secretsManagerFactory, ok := secretsManagerBackends[secretsManagerType]
 	if !ok {
-		return fmt.Errorf("secrets manager type '%s' not found", secretsManagerType)
+		return nil, fmt.Errorf("secrets manager type '%s' not found", secretsManagerType)
 	}
 
 	// Instantiate the secrets manager
@@ -532,12 +569,10 @@ func (s *Server) setupSecretsManager() error {
 	)
 
 	if factoryErr != nil {
-		return fmt.Errorf("unable to instantiate secrets manager, %w", factoryErr)
+		return nil, fmt.Errorf("unable to instantiate secrets manager, %w", factoryErr)
 	}
 
-	s.secretsManager = secretsManager
-
-	return nil
+	return secretsManager, nil
 }
 
 // setupConsensus sets up the consensus mechanism
@@ -600,32 +635,6 @@ func (s *Server) setupConsensus() error {
 	return nil
 }
 
-// extractBlockTime extracts blockTime parameter from consensus engine configuration.
-// If it is missing or invalid, an appropriate error is returned.
-func extractBlockTime(engineConfig map[string]interface{}) (common.Duration, error) {
-	blockTimeGeneric, ok := engineConfig["blockTime"]
-	if !ok {
-		return common.Duration{}, errBlockTimeMissing
-	}
-
-	blockTimeRaw, err := json.Marshal(blockTimeGeneric)
-	if err != nil {
-		return common.Duration{}, errBlockTimeInvalid
-	}
-
-	var blockTime common.Duration
-
-	if err := json.Unmarshal(blockTimeRaw, &blockTime); err != nil {
-		return common.Duration{}, errBlockTimeInvalid
-	}
-
-	if blockTime.Seconds() < 1 {
-		return common.Duration{}, errBlockTimeInvalid
-	}
-
-	return blockTime, nil
-}
-
 // setupRelayer sets up the relayer
 func (s *Server) setupRelayer() error {
 	account, err := wallet.NewAccountFromSecret(s.secretsManager)
@@ -664,12 +673,13 @@ type jsonRPCHub struct {
 	state              state.State
 	restoreProgression *progress.ProgressionWrapper
 
+	consensus.Consensus
+	consensus.BridgeDataProvider
+
 	*blockchain.Blockchain
 	*txpool.TxPool
 	*state.Executor
 	*network.Server
-	consensus.Consensus
-	consensus.BridgeDataProvider
 	gasprice.GasStore
 }
 
@@ -906,7 +916,7 @@ func (s *Server) setupJSONRPC() error {
 		Store:                    hub,
 		Addr:                     s.config.JSONRPC.JSONRPCAddr,
 		ChainID:                  uint64(s.config.Chain.Params.ChainID),
-		ChainName:                s.chain.Name,
+		ChainName:                s.config.Chain.Name,
 		AccessControlAllowOrigin: s.config.JSONRPC.AccessControlAllowOrigin,
 		PriceLimit:               s.config.PriceLimit,
 		BatchLengthLimit:         s.config.JSONRPC.BatchLengthLimit,
@@ -966,6 +976,9 @@ func (s *Server) Close() {
 		s.logger.Error("failed to close networking", "err", err.Error())
 	}
 
+	s.grpcServer.Stop()
+	s.jsonrpcServer.Stop()
+
 	// Close the consensus layer
 	if err := s.consensus.Close(); err != nil {
 		s.logger.Error("failed to close consensus", "err", err.Error())
@@ -1000,7 +1013,7 @@ type Entry struct {
 	Config  map[string]interface{}
 }
 
-func (s *Server) startPrometheusServer(listenAddr *net.TCPAddr) *http.Server {
+func startPrometheusServer(listenAddr *net.TCPAddr, logger hclog.Logger) *http.Server {
 	srv := &http.Server{
 		Addr: listenAddr.String(),
 		Handler: promhttp.InstrumentMetricHandler(
@@ -1012,12 +1025,12 @@ func (s *Server) startPrometheusServer(listenAddr *net.TCPAddr) *http.Server {
 		ReadHeaderTimeout: 60 * time.Second,
 	}
 
-	s.logger.Info("Prometheus server started", "addr=", listenAddr.String())
+	logger.Info("Prometheus server started", "addr=", listenAddr.String())
 
 	go func() {
 		if err := srv.ListenAndServe(); err != nil {
 			if !errors.Is(err, http.ErrServerClosed) {
-				s.logger.Error("Prometheus HTTP server ListenAndServe", "err", err)
+				logger.Error("Prometheus HTTP server ListenAndServe", "err", err)
 			}
 		}
 	}()
@@ -1077,4 +1090,30 @@ func initForkManager(engineName string, config *chain.Chain) error {
 	}
 
 	return nil
+}
+
+// extractBlockTime extracts blockTime parameter from consensus engine configuration.
+// If it is missing or invalid, an appropriate error is returned.
+func extractBlockTime(engineConfig map[string]interface{}) (common.Duration, error) {
+	blockTimeGeneric, ok := engineConfig["blockTime"]
+	if !ok {
+		return common.Duration{}, errBlockTimeMissing
+	}
+
+	blockTimeRaw, err := json.Marshal(blockTimeGeneric)
+	if err != nil {
+		return common.Duration{}, errBlockTimeInvalid
+	}
+
+	var blockTime common.Duration
+
+	if err := json.Unmarshal(blockTimeRaw, &blockTime); err != nil {
+		return common.Duration{}, errBlockTimeInvalid
+	}
+
+	if blockTime.Seconds() < 1 {
+		return common.Duration{}, errBlockTimeInvalid
+	}
+
+	return blockTime, nil
 }
