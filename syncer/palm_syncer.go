@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net"
 	"reflect"
-	"strings"
 	"sync"
 	"time"
 
@@ -104,7 +103,7 @@ func (p *PalmSyncer) Start() error {
 	}
 
 	cfg := &devp2p2.Config{
-		StaticPeers:   strings.Split(peers.(string), ","),
+		StaticPeers:   peers.([]string),
 		ListenAddress: netAddr.String(),
 		Blockchain:    p.blockchain,
 	}
@@ -143,7 +142,7 @@ func (p *PalmSyncer) HasSyncPeer() bool {
 	return true
 }
 
-func (p *PalmSyncer) Sync(f func(*types.FullBlock) bool) error {
+func (p *PalmSyncer) Sync(callback func(*types.FullBlock) bool) error {
 	p.logger.Info("palm syncer asked to sync")
 
 	// start up the routines to request bodies and headers
@@ -202,6 +201,12 @@ LOOP:
 		next := currentBlock + 1
 
 		for {
+			select {
+			case <-p.stop:
+				break LOOP
+			default:
+			}
+
 			header, headOk := p.getHeader(next)
 			if !headOk {
 				break
@@ -250,6 +255,10 @@ LOOP:
 				case <-p.stop:
 					break LOOP
 				default:
+				}
+
+				if callback(fullBlock) {
+					break LOOP
 				}
 			}
 		}

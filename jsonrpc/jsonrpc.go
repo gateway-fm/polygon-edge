@@ -1,6 +1,7 @@
 package jsonrpc
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -139,7 +140,7 @@ func (j *JSONRPC) setupHTTP() error {
 	go func() {
 		select {
 		case <-j.stopChan:
-			err := srv.Close()
+			err = srv.Shutdown(context.Background())
 			if err != nil {
 				j.logger.Error("unable to close http connection", "err", err)
 			}

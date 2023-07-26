@@ -233,7 +233,16 @@ func (i *backendIBFT) startSyncing() {
 
 		i.txpool.ResetWithHeaders(fullBlock.Block.Header)
 
+		if i.config.Params.StopBlock != nil && fullBlock.Block.Header.Number >= *i.config.Params.StopBlock {
+			return true
+		}
+
 		return false
+	}
+
+	// quick check to see if we should start syncing here or not
+	if i.config.Params.StopBlock != nil && i.blockchain.Header().Number >= *i.config.Params.StopBlock {
+		return
 	}
 
 	if err := i.syncer.Sync(

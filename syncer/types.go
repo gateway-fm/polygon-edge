@@ -7,13 +7,14 @@ import (
 
 	rawGrpc "google.golang.org/grpc"
 
+	"github.com/libp2p/go-libp2p/core/peer"
+	"google.golang.org/protobuf/proto"
+
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/network/event"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/libp2p/go-libp2p/core/peer"
-	"google.golang.org/protobuf/proto"
 )
 
 const syncerMetrics = "syncer"

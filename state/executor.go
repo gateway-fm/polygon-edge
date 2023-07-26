@@ -55,7 +55,9 @@ func NewExecutor(config *chain.Params, s State, logger hclog.Logger) *Executor {
 
 func (e *Executor) WriteGenesis(
 	alloc map[types.Address]*chain.GenesisAccount,
-	initialStateRoot types.Hash) (types.Hash, error) {
+	initialStateRoot types.Hash,
+	useHook bool,
+) (types.Hash, error) {
 	var (
 		snap Snapshot
 		err  error
@@ -107,7 +109,7 @@ func (e *Executor) WriteGenesis(
 		}
 	}
 
-	if e.GenesisPostHook != nil {
+	if useHook && e.GenesisPostHook != nil {
 		if err := e.GenesisPostHook(transition); err != nil {
 			return types.Hash{}, fmt.Errorf("Error writing genesis block: %w", err)
 		}

@@ -47,8 +47,6 @@ type Network struct {
 	NoDiscover       bool   `json:"no_discover" yaml:"no_discover"`
 	Libp2pAddr       string `json:"libp2p_addr" yaml:"libp2p_addr"`
 	Devp2pAddr       string `json:"devp2p_addr" yaml:"devp2p_addr"`
-	Devp2pSyncTo     uint64 `json:"devp2p_sync_to" yaml:"devp2p_sync_to"`
-	Devp2pPeers      string `json:"devp2p_peers" yaml:"devp2p_peers"`
 	NatAddr          string `json:"nat_addr" yaml:"nat_addr"`
 	DNSAddr          string `json:"dns_addr" yaml:"dns_addr"`
 	MaxPeers         int64  `json:"max_peers,omitempty" yaml:"max_peers,omitempty"`

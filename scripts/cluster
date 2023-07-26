@@ -248,6 +248,15 @@ case "$2" in
     initIbftConsensus
     # Create genesis file and start the server from binary
     createGenesis
+
+    # now merge in the palm genesis contents
+    jq -r '.genesis.alloc' genesis.json > genesis-alloc.json && \
+    jq '.params.engineForks[1].alloc = input' genesis-palm-merge.json genesis-alloc.json > genesis-merge.json && \
+    jq 'del(.genesis.alloc)' genesis.json > genesis-no-alloc.json && \
+    jq -n 'reduce inputs as $i ({}; . * $i)' genesis-no-alloc.json genesis-merge.json > genesis-merged.json && \
+    rm -f genesis.json && rm -f genesis-no-alloc.json && rm -f genesis-alloc.json && rm -f genesis-merge.json &&  \
+    mv genesis-merged.json genesis.json
+
     startServerFromBinary $2
     exit 0
   elif [ "$1" == "polybft" ]; then
@@ -255,7 +264,17 @@ case "$2" in
     initPolybftConsensus
     # Create genesis file and start the server from binary
     createGenesis
+
     initRootchain $2
+
+    # now merge in the palm genesis contents
+    jq -r '.genesis.alloc' genesis.json > genesis-alloc.json && \
+    jq '.params.engineForks[1].alloc = input' genesis-palm-merge.json genesis-alloc.json > genesis-merge.json && \
+    jq 'del(.genesis.alloc)' genesis.json > genesis-no-alloc.json && \
+    jq -n 'reduce inputs as $i ({}; . * $i)' genesis-no-alloc.json genesis-merge.json > genesis-merged.json && \
+#    rm -f genesis.json && rm -f genesis-no-alloc.json && rm -f genesis-alloc.json && rm -f genesis-merge.json &&  \
+    mv genesis-merged.json genesis.json
+
     startServerFromBinary $2
     exit 0
   else

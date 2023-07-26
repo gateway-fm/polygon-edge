@@ -82,19 +82,6 @@ func setFlags(cmd *cobra.Command) {
 		"the address and port for the devp2p service",
 	)
 
-	cmd.Flags().Uint64Var(
-		&params.rawConfig.Network.Devp2pSyncTo,
-		devp2pSyncTo,
-		0,
-		"to use devp2p whilst syncing up to a certain block height, libp2p will be used beyond here",
-	)
-	cmd.Flags().StringVar(
-		&params.rawConfig.Network.Devp2pPeers,
-		devp2ppeers,
-		"",
-		"static nodes to join on the devp2p network",
-	)
-
 	cmd.Flags().StringVar(
 		&params.rawConfig.Telemetry.PrometheusAddr,
 		prometheusAddressFlag,

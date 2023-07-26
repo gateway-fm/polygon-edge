@@ -33,6 +33,8 @@ type Params struct {
 	BurnContract map[uint64]types.Address `json:"burnContract"`
 	// Destination address to initialize default burn contract with
 	BurnContractDestinationAddress types.Address `json:"burnContractDestinationAddress,omitempty"`
+
+	StopBlock *uint64 `json:"stopBlock,omitempty"`
 }
 
 type AddressListConfig struct {
@@ -104,8 +106,9 @@ const (
 type Forks map[string]Fork
 
 type EngineFork struct {
-	Engine string `json:"engine"`
-	To     uint64 `json:"to"`
+	Engine string  `json:"engine"`
+	To     *uint64 `json:"to"`
+	Alloc  map[types.Address]*GenesisAccount
 }
 
 // IsActive returns true if fork defined by name exists and defined for the block

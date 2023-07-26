@@ -10,6 +10,8 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/hashicorp/go-hclog"
+
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
@@ -24,7 +26,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/syncer"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/hashicorp/go-hclog"
 )
 
 const (
@@ -493,6 +494,10 @@ func (p *Polybft) Start() error {
 	go common.RetryForever(context.Background(), time.Second, func(context.Context) error {
 		blockHandler := func(b *types.FullBlock) bool {
 			p.runtime.OnBlockInserted(b)
+
+			if p.config.Config.Params.StopBlock != nil && b.Block.Header.Number >= *p.config.Config.Params.StopBlock {
+				return true
+			}
 
 			return false
 		}

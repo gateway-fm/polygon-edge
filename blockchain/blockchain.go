@@ -245,7 +245,10 @@ func (b *Blockchain) initCaches(size int) error {
 }
 
 // ComputeGenesis computes the genesis hash, and updates the blockchain reference
-func (b *Blockchain) ComputeGenesis() error {
+// if we are dealing with a fork after the initial genesis then we don't want to check
+// the hash matches as the consensus layer will likely be different resulting in different
+// hashes
+func (b *Blockchain) ComputeGenesis(checkHash bool) error {
 	// try to write the genesis block
 	head, ok := b.db.ReadHeadHash()
 
@@ -257,7 +260,7 @@ func (b *Blockchain) ComputeGenesis() error {
 		}
 
 		// validate that the genesis file in storage matches the chain.Genesis
-		if b.genesis != b.config.Genesis.Hash(b.config.Params.IsPalm()) {
+		if checkHash && b.genesis != b.config.Genesis.Hash(b.config.Params.IsPalm()) {
 			return fmt.Errorf("genesis file does not match current genesis")
 		}
 
@@ -287,7 +290,11 @@ func (b *Blockchain) ComputeGenesis() error {
 		}
 	}
 
-	b.logger.Info("genesis", "hash", b.config.Genesis.Hash(b.config.Params.IsPalm()))
+	if checkHash {
+		b.logger.Info("genesis", "hash", b.config.Genesis.Hash(b.config.Params.IsPalm()))
+	} else {
+		b.logger.Info("genesis", "hash", b.genesis)
+	}
 
 	return nil
 }

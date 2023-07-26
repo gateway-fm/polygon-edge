@@ -145,29 +145,29 @@ func NewManagedServer(
 	logger hclog.Logger,
 	prometheusServer *http.Server,
 	secretsManager secrets.SecretsManager,
-	network *network.Server,
 	stateStorage itrie.Storage,
 	st *itrie.State,
 	db storage.Storage,
-	grpcServer *grpc.Server,
+	currentStateRoot types.Hash,
+	additionalAlloc map[types.Address]*chain.GenesisAccount,
+	forkNumber int,
 ) (*Server, error) {
 	m := &Server{
 		config:           config,
 		logger:           logger,
 		prometheusServer: prometheusServer,
 		secretsManager:   secretsManager,
-		network:          network,
 		stateStorage:     stateStorage,
 		state:            st,
 		db:               db,
-		grpcServer:       grpcServer,
+		grpcServer:       grpc.NewServer(grpc.UnaryInterceptor(unaryInterceptor)),
 	}
 
 	m.executor = state.NewExecutor(config.Chain.Params, st, logger)
 
 	engineName := m.config.Chain.Params.GetEngine()
 	m.engineChecks(engineName)
-	return m.buildAndRun(engineName)
+	return m.build(engineName, currentStateRoot, additionalAlloc, forkNumber)
 }
 
 // NewServer creates a new Minimal server, using the passed in configuration
@@ -263,7 +263,12 @@ func NewServer(config *Config) (*Server, error) {
 	engineName := m.config.Chain.Params.GetEngine()
 	m.engineChecks(engineName)
 
-	return m.buildAndRun(engineName)
+	srv, err := m.build(engineName, types.ZeroHash, nil, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	return srv, srv.start()
 }
 
 func (m *Server) engineChecks(engineName string) {
@@ -309,8 +314,13 @@ func (m *Server) engineChecks(engineName string) {
 	}
 }
 
-func (m *Server) buildAndRun(engineName string) (*Server, error) {
-	var initialStateRoot = types.ZeroHash
+func (m *Server) build(
+	engineName string,
+	currentStateRoot types.Hash,
+	additionalAlloc map[types.Address]*chain.GenesisAccount,
+	forkNumber int,
+) (*Server, error) {
+	initialStateRoot := types.ZeroHash
 
 	if ConsensusType(engineName) == PolyBFTConsensus {
 		polyBFTConfig, err := consensusPolyBFT.GetPolyBFTConfig(m.config.Chain)
@@ -334,17 +344,44 @@ func (m *Server) buildAndRun(engineName string) (*Server, error) {
 		}
 	}
 
-	genesisRoot, err := m.executor.WriteGenesis(m.config.Chain.Genesis.Alloc, initialStateRoot)
-	if err != nil {
-		return nil, err
+	// after we have our initial genesis forks further down the line may need to
+	// use hooks, but we must execute these after the genesis root calculation
+	// so that this stays true even though we will be adjusting the state root
+	// shortly after
+	isInitialFork := false
+	if forkNumber == 0 {
+		isInitialFork = true
 	}
 
-	if err := initForkManager(engineName, m.config.Chain); err != nil {
+	// handle the genesis root before we process any additional allocs as these will adjust
+	// the state root throwing out hash checks later on
+	genesisRoot, err := m.executor.WriteGenesis(m.config.Chain.Genesis.Alloc, initialStateRoot, isInitialFork)
+	if err != nil {
 		return nil, err
 	}
 
 	// compute the genesis root state
 	m.config.Chain.Genesis.StateRoot = genesisRoot
+
+	if !isInitialFork {
+		// we are after the first fork so we need to re-run the genesis but using hooks
+		_, err = m.executor.WriteGenesis(m.config.Chain.Genesis.Alloc, currentStateRoot, true)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if additionalAlloc != nil {
+		// no hooks here as we have executed those above
+		_, err = m.executor.WriteGenesis(additionalAlloc, currentStateRoot, isInitialFork)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if err := initForkManager(engineName, m.config.Chain); err != nil {
+		return nil, err
+	}
 
 	// Use the london signer with eip-155 as a fallback one
 	var signer crypto.TxSigner = crypto.NewLondonSigner(
@@ -376,6 +413,18 @@ func (m *Server) buildAndRun(engineName string) (*Server, error) {
 	}
 
 	m.executor.GetHash = m.blockchain.GetHashHelper
+
+	// setup libp2p
+	netConfig := m.config.Network
+	netConfig.Chain = m.config.Chain
+	netConfig.DataDir = filepath.Join(m.config.DataDir, "libp2p")
+	netConfig.SecretsManager = m.secretsManager
+
+	libp2p, err := network.NewServer(m.logger, netConfig)
+	if err != nil {
+		return nil, err
+	}
+	m.network = libp2p
 
 	{
 		hub := &txpoolHub{
@@ -415,48 +464,52 @@ func (m *Server) buildAndRun(engineName string) (*Server, error) {
 	// after consensus is done, we can mine the genesis block in blockchain
 	// This is done because consensus might use a custom Hash function so we need
 	// to wait for consensus because we do any block hashing like genesis
-	if err := m.blockchain.ComputeGenesis(); err != nil {
+	if err := m.blockchain.ComputeGenesis(forkNumber == 0); err != nil {
 		return nil, err
 	}
 
+	return m, nil
+}
+
+func (m *Server) start() error {
 	// initialize data in consensus layer
 	if err := m.consensus.Initialize(); err != nil {
-		return nil, err
+		return err
 	}
 
 	// setup and start grpc server
 	if err := m.setupGRPC(); err != nil {
-		return nil, err
+		return err
 	}
 
 	if err := m.network.Start(); err != nil {
-		return nil, err
+		return err
 	}
 
 	// setup and start jsonrpc server
 	if err := m.setupJSONRPC(); err != nil {
-		return nil, err
+		return err
 	}
 
 	// restore archive data before starting
 	if err := m.restoreChain(); err != nil {
-		return nil, err
+		return err
 	}
 
 	if err := m.consensus.Start(); err != nil {
-		return nil, err
+		return err
 	}
 
 	// start relayer
 	if m.config.Relayer {
 		if err := m.setupRelayer(); err != nil {
-			return nil, err
+			return err
 		}
 	}
 
 	m.txpool.Start()
 
-	return m, nil
+	return nil
 }
 
 func unaryInterceptor(
@@ -601,7 +654,7 @@ func (s *Server) setupConsensus() error {
 		}
 	}
 
-	engineConfig["devp2p-peers"] = s.config.DevP2PPeers
+	engineConfig["devp2p-peers"] = s.config.Chain.DevP2PBootnodes
 	engineConfig["devp2p-addr"] = s.config.DevP2PAddr
 
 	config := &consensus.Config{
@@ -966,10 +1019,15 @@ func (s *Server) JoinPeer(rawPeerMultiaddr string) error {
 
 // Close closes the Minimal server (blockchain, networking, consensus)
 func (s *Server) Close() {
-	// Close the blockchain layer
-	if err := s.blockchain.Close(); err != nil {
-		s.logger.Error("failed to close blockchain", "err", err.Error())
+	// Close the consensus layer
+	if err := s.consensus.Close(); err != nil {
+		s.logger.Error("failed to close consensus", "err", err.Error())
 	}
+
+	// Close the blockchain layer
+	//if err := s.blockchain.Close(); err != nil {
+	//	s.logger.Error("failed to close blockchain", "err", err.Error())
+	//}
 
 	// Close the networking layer
 	if err := s.network.Close(); err != nil {
@@ -979,15 +1037,10 @@ func (s *Server) Close() {
 	s.grpcServer.Stop()
 	s.jsonrpcServer.Stop()
 
-	// Close the consensus layer
-	if err := s.consensus.Close(); err != nil {
-		s.logger.Error("failed to close consensus", "err", err.Error())
-	}
-
 	// Close the state storage
-	if err := s.stateStorage.Close(); err != nil {
-		s.logger.Error("failed to close storage for trie", "err", err.Error())
-	}
+	//if err := s.stateStorage.Close(); err != nil {
+	//	s.logger.Error("failed to close storage for trie", "err", err.Error())
+	//}
 
 	if s.prometheusServer != nil {
 		if err := s.prometheusServer.Shutdown(context.Background()); err != nil {

@@ -9,10 +9,11 @@ import (
 	"github.com/0xPolygon/polygon-edge/blockchain/storage"
 	"github.com/0xPolygon/polygon-edge/blockchain/storage/memory"
 
+	"github.com/hashicorp/go-hclog"
+
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/state"
 	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
-	"github.com/hashicorp/go-hclog"
 
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -359,7 +360,7 @@ func newBlockChain(config *chain.Chain, executor Executor) (*Blockchain, error) 
 	}
 	// if we are using mock consensus we can compute right away the genesis since
 	// this consensus does not change the header hash
-	if err = b.ComputeGenesis(); err != nil {
+	if err = b.ComputeGenesis(true); err != nil {
 		return nil, fmt.Errorf("compute genisis: %w", err)
 	}
 

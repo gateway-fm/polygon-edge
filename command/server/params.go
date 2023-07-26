@@ -40,10 +40,6 @@ const (
 	corsOriginFlag               = "access-control-allow-origins"
 	logFileLocationFlag          = "log-to"
 
-	// devp2p concerns
-	devp2pSyncTo = "devp2p-sync-to"
-	devp2ppeers  = "devp2p-peers"
-
 	relayerFlag               = "relayer"
 	numBlockConfirmationsFlag = "num-block-confirmations"
 )
@@ -160,11 +156,9 @@ func (p *serverParams) generateConfig() *server.Config {
 			BatchLengthLimit:         p.rawConfig.JSONRPCBatchRequestLimit,
 			BlockRangeLimit:          p.rawConfig.JSONRPCBlockRangeLimit,
 		},
-		GRPCAddr:     p.grpcAddress,
-		LibP2PAddr:   p.libp2pAddress,
-		DevP2PAddr:   p.devp2pAddress,
-		DevP2PSyncTo: p.rawConfig.Network.Devp2pSyncTo,
-		DevP2PPeers:  p.rawConfig.Network.Devp2pPeers,
+		GRPCAddr:   p.grpcAddress,
+		LibP2PAddr: p.libp2pAddress,
+		DevP2PAddr: p.devp2pAddress,
 		Telemetry: &server.Telemetry{
 			PrometheusAddr: p.prometheusAddress,
 		},

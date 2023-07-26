@@ -1,0 +1,84 @@
+{
+  "name": "palm",
+  "genesis": {
+    "extraData": "0xf87ea00000000000000000000000000000000000000000000000000000000000000000f8549445c09591de259c4a81cdec4779cb50019933ca30941cf698ebfdc7a528ca02760c4d49d1bb0423486c9448d4295c257384b3264a4572f3a1268a45b7095f948ddf64b1e33ae6f333f68c96f5712d327f4cb075808400000000c0",
+    "gasLimit": "0x11EDD80",
+    "mixHash": "0x63746963616c2062797a616e74696e65206661756c7420746f6c6572616e6365",
+    "difficulty": "0x1",
+    "number": "0x0",
+    "gasUsed": "0x0",
+    "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+    "baseFee": "0x0",
+    "baseFeeEM": "0x0",
+    "alloc": {
+      "0x4AAdf7Fa51731af0A3b6e377977D80416f25B11A": {
+        "balance": "1000000000000000000000000000"
+      }
+    }
+  },
+  "params": {
+    "forks": {
+      "homestead": {
+        "block": 0
+      },
+      "byzantium": {
+        "block": 0
+      },
+      "constantinople": {
+        "block": 0
+      },
+      "petersburg": {
+        "block": 0
+      },
+      "istanbul": {
+        "block": 0
+      },
+      "berlin": {
+        "block": 0
+      },
+      "EIP150": {
+        "block": 0
+      },
+      "EIP158": {
+        "block": 0
+      },
+      "EIP155": {
+        "block": 0
+      },
+      "EIP2929": {
+        "block": 0
+      },
+      "EIP2930": {
+        "block": 0
+      }
+    },
+    "chainID": 11297108099,
+    "engine": {
+      "ibft": {
+        "type": "PoA",
+        "validator_type": "ecdsa",
+        "blockperiodseconds": 5,
+        "blockTime": "5s",
+        "epochlength": 30000,
+        "blockreward": "114085402000000000",
+        "requesttimeoutseconds": 10
+      }
+    },
+    "engineForks": [
+      {
+        "engine": "ibft",
+        "to": 1000
+      },
+      {
+        "engine": "polybft",
+        "to": null,
+        "alloc": {
+
+        }
+      }
+    ]
+  },
+  "devp2pBootnodes": [
+    "enode://582111526ce95aadc951cc5ac707f1c45f88930b5a1c324a97e102098995f227d23a2fca4ac4f790ed3f4beeb0c3db9914bce87548cafe53396697cc326e2ed6@127.0.0.1:30401"
+  ]
+}
