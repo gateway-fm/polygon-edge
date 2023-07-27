@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/hashicorp/go-hclog"
+
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/hashicorp/go-hclog"
 )
 
 type validatorSnapshot struct {
@@ -51,7 +52,10 @@ func newValidatorsSnapshotCache(
 // applies pending validator set deltas to it.
 // Otherwise, it builds a snapshot from scratch and applies pending validator set deltas.
 func (v *validatorsSnapshotCache) GetSnapshot(
-	blockNumber uint64, parents []*types.Header) (validator.AccountSet, error) {
+	blockNumber uint64,
+	parents []*types.Header,
+	latestGenesis uint64,
+) (validator.AccountSet, error) {
 	v.lock.Lock()
 	defer v.lock.Unlock()
 
@@ -60,16 +64,22 @@ func (v *validatorsSnapshotCache) GetSnapshot(
 		return nil, err
 	}
 
-	isEpochEndingBlock, err := isEpochEndingBlock(blockNumber, extra, v.blockchain)
-	if err != nil && !errors.Is(err, blockchain.ErrNoBlock) {
-		// if there is no block after given block, we assume its not epoch ending block
-		// but, it's a regular use case, and we should not stop the snapshot calculation
-		// because there are cases we need the snapshot for the latest block in chain
-		return nil, err
+	epochEndingBlock := true
+	if blockNumber == latestGenesis {
+		// at the fork point so we know we're not ending an epoch here
+		epochEndingBlock = false
+	} else {
+		epochEndingBlock, err = isEpochEndingBlock(blockNumber, extra, v.blockchain)
+		if err != nil && !errors.Is(err, blockchain.ErrNoBlock) {
+			// if there is no block after given block, we assume its not epoch ending block
+			// but, it's a regular use case, and we should not stop the snapshot calculation
+			// because there are cases we need the snapshot for the latest block in chain
+			return nil, err
+		}
 	}
 
 	epochToGetSnapshot := extra.Checkpoint.EpochNumber
-	if !isEpochEndingBlock {
+	if !epochEndingBlock {
 		epochToGetSnapshot--
 	}
 
@@ -88,7 +98,7 @@ func (v *validatorsSnapshotCache) GetSnapshot(
 	if latestValidatorSnapshot == nil {
 		// Haven't managed to retrieve snapshot for any epoch from the cache.
 		// Build snapshot from the scratch, by applying delta from the genesis block.
-		genesisBlockSnapshot, err := v.computeSnapshot(nil, 0, parents)
+		genesisBlockSnapshot, err := v.computeSnapshot(nil, latestGenesis, parents)
 		if err != nil {
 			return nil, fmt.Errorf("failed to compute snapshot for epoch 0: %w", err)
 		}

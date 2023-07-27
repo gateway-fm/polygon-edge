@@ -158,30 +158,30 @@ function startServerFromBinary() {
   if [ "$1" == "write-logs" ]; then
     echo "Writing validators logs to the files..."
     ./polygon-edge server --data-dir ./test-chain-1 --chain genesis.json \
-      --grpc-address :10000 --libp2p :30301 --jsonrpc :10002 --relayer \
+      --grpc-address :10000 --libp2p :30301 --devp2p :30601 --jsonrpc :10002 --relayer \
       --num-block-confirmations 2 --seal --log-level DEBUG 2>&1 | tee ./validator-1.log &
     ./polygon-edge server --data-dir ./test-chain-2 --chain genesis.json \
-      --grpc-address :20000 --libp2p :30302 --jsonrpc :20002 \
+      --grpc-address :20000 --libp2p :30302 --devp2p :30602 --jsonrpc :20002 \
       --num-block-confirmations 2 --seal --log-level DEBUG 2>&1 | tee ./validator-2.log &
     ./polygon-edge server --data-dir ./test-chain-3 --chain genesis.json \
-      --grpc-address :30000 --libp2p :30303 --jsonrpc :30002 \
+      --grpc-address :30000 --libp2p :30303 --devp2p :30603 --jsonrpc :30002 \
       --num-block-confirmations 2 --seal --log-level DEBUG 2>&1 | tee ./validator-3.log &
     ./polygon-edge server --data-dir ./test-chain-4 --chain genesis.json \
-      --grpc-address :40000 --libp2p :30304 --jsonrpc :40002 \
+      --grpc-address :40000 --libp2p :30304 --devp2p :30604 --jsonrpc :40002 \
       --num-block-confirmations 2 --seal --log-level DEBUG 2>&1 | tee ./validator-4.log &
     wait
   else
     ./polygon-edge server --data-dir ./test-chain-1 --chain genesis.json \
-      --grpc-address :10000 --libp2p :30301 --jsonrpc :10002 --relayer \
+      --grpc-address :10000 --libp2p :30301 --devp2p :30601 --jsonrpc :10002 --relayer \
       --num-block-confirmations 2 --seal --log-level DEBUG &
     ./polygon-edge server --data-dir ./test-chain-2 --chain genesis.json \
-      --grpc-address :20000 --libp2p :30302 --jsonrpc :20002 \
+      --grpc-address :20000 --libp2p :30302 --devp2p :30602 --jsonrpc :20002 \
       --num-block-confirmations 2 --seal --log-level DEBUG &
     ./polygon-edge server --data-dir ./test-chain-3 --chain genesis.json \
-      --grpc-address :30000 --libp2p :30303 --jsonrpc :30002 \
+      --grpc-address :30000 --libp2p :30303 --devp2p :30603 --jsonrpc :30002 \
       --num-block-confirmations 2 --seal --log-level DEBUG &
     ./polygon-edge server --data-dir ./test-chain-4 --chain genesis.json \
-      --grpc-address :40000 --libp2p :30304 --jsonrpc :40002 \
+      --grpc-address :40000 --libp2p :30304 --devp2p :30604 --jsonrpc :40002 \
       --num-block-confirmations 2 --seal --log-level DEBUG &
     wait
   fi

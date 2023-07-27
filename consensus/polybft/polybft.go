@@ -533,6 +533,9 @@ func (p *Polybft) initRuntime() error {
 		txPool:                p.txPool,
 		bridgeTopic:           p.bridgeTopic,
 		numBlockConfirmations: p.config.NumBlockConfirmations,
+		fromForked:            p.config.FromForked,
+		atForkPoint:           p.config.AtForkPoint,
+		latestGenesis:         p.config.Config.Params.LatestGenesis,
 	}
 
 	runtime, err := newConsensusRuntime(p.logger, runtimeConfig)
@@ -707,7 +710,7 @@ func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, blockTimeDrift 
 }
 
 func (p *Polybft) GetValidators(blockNumber uint64, parents []*types.Header) (validator.AccountSet, error) {
-	return p.validatorsCache.GetSnapshot(blockNumber, parents)
+	return p.validatorsCache.GetSnapshot(blockNumber, parents, p.config.Config.Params.LatestGenesis)
 }
 
 // ProcessHeaders updates the snapshot based on the verified headers

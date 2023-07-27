@@ -7,12 +7,16 @@ import (
 
 	"github.com/hashicorp/go-hclog"
 
+	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/blockchain/storage"
 	"github.com/0xPolygon/polygon-edge/blockchain/storage/leveldb"
 	"github.com/0xPolygon/polygon-edge/blockchain/storage/memory"
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/secrets"
+	"github.com/0xPolygon/polygon-edge/state"
 	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -117,7 +121,7 @@ func (m *Manager) Start() error {
 	if len(m.Config.Chain.Params.EngineForks) == 0 {
 		m.logger.Info("no forks detected, running in simple mode")
 		// no forks, just start the default server
-		srv, err := m.createServer(m.Config, types.ZeroHash, nil, 0)
+		srv, err := m.createServer(m.Config, 0, false)
 		if err != nil {
 			return err
 		}
@@ -139,9 +143,8 @@ func (m *Manager) Start() error {
 
 func (m *Manager) createServer(
 	config *Config,
-	currentStateRoot types.Hash,
-	additionalAlloc map[types.Address]*chain.GenesisAccount,
 	forkNumber int,
+	atForkPoint bool,
 ) (*Server, error) {
 	return NewManagedServer(
 		config,
@@ -151,9 +154,8 @@ func (m *Manager) createServer(
 		m.stateStorage,
 		m.state,
 		m.db,
-		currentStateRoot,
-		additionalAlloc,
 		forkNumber,
+		atForkPoint,
 	)
 }
 
@@ -162,11 +164,11 @@ func (m *Manager) createServer(
 func (m *Manager) loadNextFork() error {
 	// header could be available if we're in process at the fork, or if the application is starting
 	// from cold we can read it from the database.
-	initialStateRoot := types.ZeroHash
 	var head uint64 = 0
+	var header *types.Header
 	if m.currentHeader != nil {
 		head = m.currentHeader.Number
-		initialStateRoot = m.currentHeader.StateRoot
+		header = m.currentHeader
 	}
 	if head == 0 {
 		hash, ok := m.db.ReadHeadHash()
@@ -176,7 +178,8 @@ func (m *Manager) loadNextFork() error {
 				return err
 			}
 			head = h.Number
-			initialStateRoot = h.StateRoot
+			header = h
+			header.Hash = hash // consensus can mess with this so take db version
 		}
 	}
 	m.logger.Info("current head", "head", head)
@@ -207,6 +210,10 @@ func (m *Manager) loadNextFork() error {
 			// engine
 			m.Config.Chain.Params.Engine = newEngineParams
 
+			if err := m.handleForkGenesisOverrides(fork); err != nil {
+				return err
+			}
+
 			if fork.To == nil {
 				m.logger.Info("server manager loading engine fork", "engine", fork.Engine, "block", "nil")
 			} else {
@@ -218,9 +225,35 @@ func (m *Manager) loadNextFork() error {
 			// beyond the fork point
 			m.Config.Chain.Params.StopBlock = fork.To
 
-			srv, err := m.createServer(m.Config, initialStateRoot, fork.Alloc, forkNumber)
+			var lastFork chain.EngineFork
+			exactForkPoint := false
+			if forkNumber > 0 {
+				lastFork = forks[forkNumber-1]
+				if lastFork.To != nil && head == *lastFork.To {
+					exactForkPoint = true
+				}
+				to := *lastFork.To
+				m.Config.Chain.Params.LatestGenesis = to + 1
+			}
+
+			srv, err := m.createServer(
+				m.Config,
+				forkNumber,
+				exactForkPoint,
+			)
 			if err != nil {
 				return err
+			}
+
+			// only insert the fork block if we are at the exact fork point - we need to do this
+			// after creating the server so the correct hashing algo is used for the block
+			if forkNumber > 0 && lastFork.To != nil && head == *lastFork.To {
+				if fork.Engine == "polybft" {
+					err = m.insertPolybftForkBlock(fork, header, srv.blockchain)
+					if err != nil {
+						return err
+					}
+				}
 			}
 
 			m.active = srv
@@ -237,6 +270,143 @@ func (m *Manager) loadNextFork() error {
 	}
 
 	return nil
+}
+
+func (m *Manager) handleForkGenesisOverrides(fork chain.EngineFork) error {
+	if fork.BaseFee != nil {
+		v, err := common.ParseUint64orHex(fork.BaseFee)
+		if err != nil {
+			return err
+		}
+		m.Config.Chain.Genesis.BaseFee = v
+	}
+	if fork.BaseFeeEM != nil {
+		v, err := common.ParseUint64orHex(fork.BaseFeeEM)
+		if err != nil {
+			return err
+		}
+		m.Config.Chain.Genesis.BaseFeeEM = v
+	}
+	if fork.GasLimit != nil {
+		v, err := common.ParseUint64orHex(fork.GasLimit)
+		if err != nil {
+			return err
+		}
+		m.Config.Chain.Genesis.GasLimit = v
+	}
+	if fork.GasUsed != nil {
+		v, err := common.ParseUint64orHex(fork.GasUsed)
+		if err != nil {
+			return err
+		}
+		m.Config.Chain.Genesis.GasUsed = v
+	}
+
+	return nil
+}
+
+func (m *Manager) insertPolybftForkBlock(
+	fork chain.EngineFork,
+	currentHeader *types.Header,
+	blockchain *blockchain.Blockchain,
+) error {
+	if fork.Alloc == nil {
+		// only interested if the fork block has allocs so we can handle the state root changees for them
+		return nil
+	}
+
+	// compute genesis here will set the current block on the blockchain but it will be missing the hash
+	// so we can set it with the one we already have
+	err := blockchain.ComputeGenesis(false)
+	if err != nil {
+		return err
+	}
+	b := blockchain.Header()
+	b.Hash = currentHeader.Hash
+
+	if fork.To != nil && b.Number > *fork.To {
+		// we must have already inserted this block so return
+		return nil
+	}
+
+	executor := state.NewExecutor(m.Config.Chain.Params, m.state, m.logger)
+	newStateRoot, err := executor.WriteGenesis(fork.Alloc, currentHeader.StateRoot, true)
+	if err != nil {
+		return err
+	}
+
+	// get the polybft config
+	polyCfg, err := polybft.GetPolyBFTConfig(m.Config.Chain)
+	if err != nil {
+		return err
+	}
+
+	// insert the initial validator set into our mid-chain magic genesis
+	oldValidators := validator.AccountSet{}
+	newValidators := validator.AccountSet{}
+
+	for _, v := range polyCfg.InitialValidatorSet {
+		md, err := v.ToValidatorMetadata()
+		if err != nil {
+			return err
+		}
+		newValidators = append(newValidators, md)
+	}
+
+	vsd, err := validator.CreateValidatorSetDelta(oldValidators, newValidators)
+	if err != nil {
+		return err
+	}
+
+	extraData := polybft.Extra{
+		Validators: vsd,
+		Parent:     nil,
+		Committed:  &polybft.Signature{},
+		Checkpoint: &polybft.CheckpointData{
+			BlockRound:            1,
+			EpochNumber:           1,
+			CurrentValidatorsHash: types.Hash{},
+			NextValidatorsHash:    types.Hash{},
+			EventRoot:             types.Hash{},
+		},
+	}
+	magic := []byte("magic_0x01")
+	extraBytes := extraData.MarshalRLPTo(nil)
+	copy(extraBytes, magic)
+
+	header := &types.Header{
+		ParentHash:   currentHeader.Hash,
+		Sha3Uncles:   types.Hash{},
+		Miner:        types.Address{}.Bytes(),
+		StateRoot:    newStateRoot,
+		TxRoot:       types.Hash{},
+		ReceiptsRoot: types.Hash{},
+		LogsBloom:    types.Bloom{},
+		Difficulty:   1,
+		Number:       currentHeader.Number + 1,
+		GasLimit:     m.Config.Chain.Genesis.GasLimit,
+		GasUsed:      m.Config.Chain.Genesis.GasUsed,
+		Timestamp:    currentHeader.Timestamp + 1,
+		ExtraData:    extraBytes,
+		MixHash:      types.Hash{},
+		Nonce:        types.Nonce{},
+		Hash:         types.Hash{},
+		BaseFee:      m.Config.Chain.Genesis.BaseFee,
+	}
+	header.ComputeHash()
+
+	block := &types.Block{
+		Header:       header,
+		Transactions: []*types.Transaction{},
+		Uncles:       []*types.Header{},
+	}
+
+	fb := types.FullBlock{
+		Block:    block,
+		Receipts: nil,
+	}
+
+	return blockchain.WriteFullBlock(&fb, "server_manager")
 }
 
 func (m *Manager) monitorForNextFork() {

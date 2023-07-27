@@ -80,6 +80,9 @@ type runtimeConfig struct {
 	txPool                txPoolInterface
 	bridgeTopic           topic
 	numBlockConfirmations uint64
+	fromForked            bool
+	atForkPoint           bool
+	latestGenesis         uint64
 }
 
 // consensusRuntime is a struct that provides consensus runtime features like epoch, state and event management
@@ -447,9 +450,14 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) (*epochMetadata, e
 		Validators: validatorSet,
 	})
 
-	firstBlockInEpoch, err := c.getFirstBlockOfEpoch(epochNumber, header)
-	if err != nil {
-		return nil, err
+	var firstBlockInEpoch uint64
+	if c.config.atForkPoint {
+		firstBlockInEpoch = header.Number + 1
+	} else {
+		firstBlockInEpoch, err = c.getFirstBlockOfEpoch(epochNumber, header)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if err := c.state.EpochStore.cleanEpochsFromDB(); err != nil {

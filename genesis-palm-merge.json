@@ -72,6 +72,10 @@
       {
         "engine": "polybft",
         "to": null,
+        "baseFee": "0x3b9aca00",
+        "baseFeeEM": "0x2",
+        "gasLimit": "0x989680",
+        "gasUsed": "0x70000",
         "alloc": {
 
         }

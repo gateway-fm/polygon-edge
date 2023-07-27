@@ -148,9 +148,8 @@ func NewManagedServer(
 	stateStorage itrie.Storage,
 	st *itrie.State,
 	db storage.Storage,
-	currentStateRoot types.Hash,
-	additionalAlloc map[types.Address]*chain.GenesisAccount,
 	forkNumber int,
+	atForkPoint bool,
 ) (*Server, error) {
 	m := &Server{
 		config:           config,
@@ -164,10 +163,9 @@ func NewManagedServer(
 	}
 
 	m.executor = state.NewExecutor(config.Chain.Params, st, logger)
-
 	engineName := m.config.Chain.Params.GetEngine()
 	m.engineChecks(engineName)
-	return m.build(engineName, currentStateRoot, additionalAlloc, forkNumber)
+	return m.build(engineName, forkNumber, atForkPoint)
 }
 
 // NewServer creates a new Minimal server, using the passed in configuration
@@ -263,7 +261,7 @@ func NewServer(config *Config) (*Server, error) {
 	engineName := m.config.Chain.Params.GetEngine()
 	m.engineChecks(engineName)
 
-	srv, err := m.build(engineName, types.ZeroHash, nil, 0)
+	srv, err := m.build(engineName, 0, false)
 	if err != nil {
 		return nil, err
 	}
@@ -316,9 +314,8 @@ func (m *Server) engineChecks(engineName string) {
 
 func (m *Server) build(
 	engineName string,
-	currentStateRoot types.Hash,
-	additionalAlloc map[types.Address]*chain.GenesisAccount,
 	forkNumber int,
+	atForkPoint bool,
 ) (*Server, error) {
 	initialStateRoot := types.ZeroHash
 
@@ -359,25 +356,7 @@ func (m *Server) build(
 	if err != nil {
 		return nil, err
 	}
-
-	// compute the genesis root state
 	m.config.Chain.Genesis.StateRoot = genesisRoot
-
-	if !isInitialFork {
-		// we are after the first fork so we need to re-run the genesis but using hooks
-		_, err = m.executor.WriteGenesis(m.config.Chain.Genesis.Alloc, currentStateRoot, true)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if additionalAlloc != nil {
-		// no hooks here as we have executed those above
-		_, err = m.executor.WriteGenesis(additionalAlloc, currentStateRoot, isInitialFork)
-		if err != nil {
-			return nil, err
-		}
-	}
 
 	if err := initForkManager(engineName, m.config.Chain); err != nil {
 		return nil, err
@@ -455,7 +434,10 @@ func (m *Server) build(
 
 	{
 		// Setup consensus
-		if err := m.setupConsensus(); err != nil {
+		if err := m.setupConsensus(
+			forkNumber > 0,
+			atForkPoint,
+		); err != nil {
 			return nil, err
 		}
 		m.blockchain.SetConsensus(m.consensus)
@@ -629,7 +611,10 @@ func setupSecretsManager(config *Config, logger hclog.Logger) (secrets.SecretsMa
 }
 
 // setupConsensus sets up the consensus mechanism
-func (s *Server) setupConsensus() error {
+func (s *Server) setupConsensus(
+	fromForked bool,
+	atForkPoint bool,
+) error {
 	engineName := s.config.Chain.Params.GetEngine()
 	engine, ok := consensusBackends[ConsensusType(engineName)]
 
@@ -676,6 +661,8 @@ func (s *Server) setupConsensus() error {
 			SecretsManager:        s.secretsManager,
 			BlockTime:             uint64(blockTime.Seconds()),
 			NumBlockConfirmations: s.config.NumBlockConfirmations,
+			FromForked:            fromForked,
+			AtForkPoint:           atForkPoint,
 		},
 	)
 

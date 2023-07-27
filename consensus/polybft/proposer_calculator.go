@@ -5,10 +5,11 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/hashicorp/go-hclog"
+
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/hashicorp/go-hclog"
 )
 
 var (
@@ -41,12 +42,12 @@ func NewProposerSnapshotFromState(config *runtimeConfig) (*ProposerSnapshot, err
 
 	if snapshot == nil {
 		// pick validator set from genesis block if snapshot is not saved in db
-		genesisValidatorsSet, err := config.polybftBackend.GetValidators(0, nil)
+		genesisValidatorsSet, err := config.polybftBackend.GetValidators(config.latestGenesis, nil)
 		if err != nil {
 			return nil, err
 		}
 
-		snapshot = NewProposerSnapshot(1, genesisValidatorsSet)
+		snapshot = NewProposerSnapshot(config.latestGenesis+1, genesisValidatorsSet)
 	}
 
 	return snapshot, nil

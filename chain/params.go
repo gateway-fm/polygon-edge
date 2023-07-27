@@ -35,6 +35,10 @@ type Params struct {
 	BurnContractDestinationAddress types.Address `json:"burnContractDestinationAddress,omitempty"`
 
 	StopBlock *uint64 `json:"stopBlock,omitempty"`
+
+	// once a chain has forked to a new consensus engine the genesis block will effectively not be 0
+	// and will be the block inserted at the fork point
+	LatestGenesis uint64 `json:"latestGenesis,omitempty"`
 }
 
 type AddressListConfig struct {
@@ -86,18 +90,18 @@ func (p *Params) IsPalm() bool {
 
 // predefined forks
 const (
-	EIP2929        = "EIP2929"
-	EIP155         = "EIP155"
-	EIP158         = "EIP158"
-	EIP150         = "EIP150"
-	Berlin         = "berlin"
-	London         = "london"
-	Istanbul       = "istanbul"
-	Petersburg     = "petersburg"
-	Constantinople = "constantinople"
-	Byzantium      = "byzantium"
-	Homestead      = "homestead"
-	EIP2930        = "EIP2930"
+	EIP2929             = "EIP2929"
+	EIP155              = "EIP155"
+	EIP158              = "EIP158"
+	EIP150              = "EIP150"
+	Berlin              = "berlin"
+	London              = "london"
+	Istanbul            = "istanbul"
+	Petersburg          = "petersburg"
+	Constantinople      = "constantinople"
+	Byzantium           = "byzantium"
+	Homestead           = "homestead"
+	EIP2930             = "EIP2930"
 	QuorumCalcAlignment = "quorumcalcalignment"
 	TxHashWithType      = "txHashWithType"
 )
@@ -106,9 +110,13 @@ const (
 type Forks map[string]Fork
 
 type EngineFork struct {
-	Engine string  `json:"engine"`
-	To     *uint64 `json:"to"`
-	Alloc  map[types.Address]*GenesisAccount
+	Engine    string  `json:"engine"`
+	To        *uint64 `json:"to"`
+	BaseFee   *string `json:"baseFee"`
+	BaseFeeEM *string `json:"baseFeeEM"`
+	GasLimit  *string `json:"gasLimit"`
+	GasUsed   *string `json:"gasUsed"`
+	Alloc     map[types.Address]*GenesisAccount
 }
 
 // IsActive returns true if fork defined by name exists and defined for the block
@@ -130,18 +138,18 @@ func (f *Forks) RemoveFork(name string) {
 // At returns ForksInTime instance that shows which supported forks are enabled for the block
 func (f *Forks) At(block uint64) ForksInTime {
 	return ForksInTime{
-		Homestead:      f.IsActive(Homestead, block),
-		Byzantium:      f.IsActive(Byzantium, block),
-		Constantinople: f.IsActive(Constantinople, block),
-		Petersburg:     f.IsActive(Petersburg, block),
-		Istanbul:       f.IsActive(Istanbul, block),
-		London:         f.IsActive(London, block),
-		Berlin:         f.IsActive(Berlin, block),
-		EIP150:         f.IsActive(EIP150, block),
-		EIP158:         f.IsActive(EIP158, block),
-		EIP155:         f.IsActive(EIP155, block),
-		EIP2929:        f.IsActive(EIP2929, block),
-		EIP2930:        f.IsActive(EIP2930, block),
+		Homestead:           f.IsActive(Homestead, block),
+		Byzantium:           f.IsActive(Byzantium, block),
+		Constantinople:      f.IsActive(Constantinople, block),
+		Petersburg:          f.IsActive(Petersburg, block),
+		Istanbul:            f.IsActive(Istanbul, block),
+		London:              f.IsActive(London, block),
+		Berlin:              f.IsActive(Berlin, block),
+		EIP150:              f.IsActive(EIP150, block),
+		EIP158:              f.IsActive(EIP158, block),
+		EIP155:              f.IsActive(EIP155, block),
+		EIP2929:             f.IsActive(EIP2929, block),
+		EIP2930:             f.IsActive(EIP2930, block),
 		QuorumCalcAlignment: f.IsActive(QuorumCalcAlignment, block),
 		TxHashWithType:      f.IsActive(TxHashWithType, block),
 	}
@@ -180,18 +188,18 @@ type ForksInTime struct {
 
 // AllForksEnabled should contain all supported forks by current edge version
 var AllForksEnabled = &Forks{
-	Homestead:      NewFork(0),
-	EIP150:         NewFork(0),
-	EIP155:         NewFork(0),
-	EIP158:         NewFork(0),
-	Byzantium:      NewFork(0),
-	Constantinople: NewFork(0),
-	Petersburg:     NewFork(0),
-	Istanbul:       NewFork(0),
-	London:         NewFork(0),
-	Berlin:         NewFork(0),
-	EIP2929:        NewFork(0),
-	EIP2930:        NewFork(0),
+	Homestead:           NewFork(0),
+	EIP150:              NewFork(0),
+	EIP155:              NewFork(0),
+	EIP158:              NewFork(0),
+	Byzantium:           NewFork(0),
+	Constantinople:      NewFork(0),
+	Petersburg:          NewFork(0),
+	Istanbul:            NewFork(0),
+	London:              NewFork(0),
+	Berlin:              NewFork(0),
+	EIP2929:             NewFork(0),
+	EIP2930:             NewFork(0),
 	QuorumCalcAlignment: NewFork(0),
 	TxHashWithType:      NewFork(0),
 }
