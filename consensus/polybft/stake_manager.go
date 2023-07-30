@@ -8,6 +8,10 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/hashicorp/go-hclog"
+	"github.com/umbracle/ethgo"
+	"github.com/umbracle/ethgo/abi"
+
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
@@ -15,9 +19,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/hashicorp/go-hclog"
-	"github.com/umbracle/ethgo"
-	"github.com/umbracle/ethgo/abi"
 )
 
 var (
@@ -56,6 +57,8 @@ type stakeManager struct {
 	supernetManagerContract types.Address
 	maxValidatorSetSize     int
 	eventsGetter            *eventsGetter[*contractsapi.TransferEvent]
+	// if a consensus fork has happened it will be stored here or will be 0
+	forkBlock uint64
 }
 
 // newStakeManager returns a new instance of stake manager
@@ -67,6 +70,7 @@ func newStakeManager(
 	validatorSetAddr, supernetManagerAddr types.Address,
 	blockchain blockchainBackend,
 	maxValidatorSetSize int,
+	forkBlock uint64,
 ) *stakeManager {
 	eventsGetter := &eventsGetter[*contractsapi.TransferEvent]{
 		blockchain: blockchain,
@@ -89,6 +93,7 @@ func newStakeManager(
 		supernetManagerContract: supernetManagerAddr,
 		maxValidatorSetSize:     maxValidatorSetSize,
 		eventsGetter:            eventsGetter,
+		forkBlock:               forkBlock,
 	}
 }
 
@@ -98,11 +103,24 @@ func (s *stakeManager) PostEpoch(req *PostEpochRequest) error {
 		return nil
 	}
 
+	var (
+		blockNumber uint64 = 0
+		updatedAt   uint64 = 0
+		epochID     uint64 = 0
+	)
+
+	// we need to handle a fork here if one has happened so will manipulate the block number
+	// to represent that
+	if s.forkBlock > 0 && req.FirstBlockOfEpoch == s.forkBlock {
+		blockNumber = s.forkBlock
+		updatedAt = s.forkBlock
+	}
+
 	// save initial validator set as full validator set in db
 	return s.state.StakeStore.insertFullValidatorSet(validatorSetState{
-		BlockNumber:          0,
-		EpochID:              0,
-		UpdatedAtBlockNumber: 0,
+		BlockNumber:          blockNumber,
+		EpochID:              epochID,
+		UpdatedAtBlockNumber: updatedAt,
 		Validators:           newValidatorStakeMap(req.ValidatorSet.Accounts()),
 	})
 }
@@ -133,8 +151,19 @@ func (s *stakeManager) updateWithReceipts(
 	fullValidatorSet *validatorSetState, fullBlock *types.FullBlock) error {
 	var transferEvents []*contractsapi.TransferEvent
 
+	// if we started from a fork point then we need to make the validator set
+	// appear as though it was last updated at the fork point so we don't
+	// try to process events for blocks that were created before the fork
+	fromBlock := fullValidatorSet.BlockNumber
+	if fromBlock == 0 {
+		s.logger.Debug("updateWithReceipts updating full validator set block number for fork",
+			"fromBlock", fromBlock,
+			"forkBlock", s.forkBlock)
+		fromBlock = s.forkBlock
+	}
+
 	// get transfer currentBlockEvents from current block
-	transferEvents, err := s.eventsGetter.getFromBlocks(fullValidatorSet.BlockNumber, fullBlock)
+	transferEvents, err := s.eventsGetter.getFromBlocks(fromBlock, fullBlock)
 	if err != nil {
 		return fmt.Errorf("could not get transfer events from current block. Error: %w", err)
 	}
@@ -177,7 +206,11 @@ func (s *stakeManager) updateWithReceipts(
 	// mark on which block validator set has been updated
 	fullValidatorSet.UpdatedAtBlockNumber = fullValidatorSet.BlockNumber
 
-	s.logger.Debug("Full validator set after", "block", fullBlock.Block, "data", fullValidatorSet.Validators)
+	s.logger.Debug("Full validator set after",
+		"block", fullBlock.Block,
+		"data", fullValidatorSet.Validators,
+		"fullValidatorSet.updatedAtBlockNumber", fullValidatorSet.UpdatedAtBlockNumber,
+		"fullValidatorSet.blockNumber", fullValidatorSet.BlockNumber)
 
 	return nil
 }

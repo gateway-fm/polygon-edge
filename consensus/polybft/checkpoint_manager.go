@@ -7,6 +7,10 @@ import (
 	"sort"
 	"strconv"
 
+	"github.com/armon/go-metrics"
+	"github.com/hashicorp/go-hclog"
+	"github.com/umbracle/ethgo"
+
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
@@ -15,9 +19,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/merkle-tree"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
-	metrics "github.com/armon/go-metrics"
-	hclog "github.com/hashicorp/go-hclog"
-	"github.com/umbracle/ethgo"
 )
 
 var (
@@ -70,13 +71,15 @@ type checkpointManager struct {
 	state *State
 	// eventGetter gets exit events (missed or current) from blocks
 	eventGetter *eventsGetter[*ExitEvent]
+	// holds a block number at which the latest fork happened for switching consensus
+	forkBlock uint64
 }
 
 // newCheckpointManager creates a new instance of checkpointManager
 func newCheckpointManager(key ethgo.Key, checkpointOffset uint64,
 	checkpointManagerSC types.Address, txRelayer txrelayer.TxRelayer,
 	blockchain blockchainBackend, backend polybftBackend, logger hclog.Logger,
-	state *State) *checkpointManager {
+	state *State, forkBlock uint64) *checkpointManager {
 	retry := &eventsGetter[*ExitEvent]{
 		blockchain: blockchain,
 		isValidLogFn: func(l *types.Log) bool {
@@ -95,6 +98,7 @@ func newCheckpointManager(key ethgo.Key, checkpointOffset uint64,
 		logger:                logger,
 		state:                 state,
 		eventGetter:           retry,
+		forkBlock:             forkBlock,
 	}
 }
 
@@ -127,6 +131,13 @@ func (c *checkpointManager) submitCheckpoint(latestHeader *types.Header, isEndOf
 	lastCheckpointBlockNumber, err := c.getLatestCheckpointBlock()
 	if err != nil {
 		return err
+	}
+
+	if lastCheckpointBlockNumber == 0 {
+		if c.forkBlock > 0 {
+			c.logger.Info("checkpoint manager updating last block to handle fork", "lastCheckpointBlockNumber", lastCheckpointBlockNumber, "forkBlock", c.forkBlock)
+			lastCheckpointBlockNumber = c.forkBlock
+		}
 	}
 
 	c.logger.Debug("submitCheckpoint invoked...",
@@ -169,7 +180,8 @@ func (c *checkpointManager) submitCheckpoint(latestHeader *types.Header, isEndOf
 		parentEpochNumber := parentExtra.Checkpoint.EpochNumber
 		currentEpochNumber := currentExtra.Checkpoint.EpochNumber
 		// send pending checkpoints only for epoch ending blocks
-		if blockNumber == 1 || parentEpochNumber == currentEpochNumber {
+		// todo [palm] - are we right in our logic here?
+		if blockNumber == 1 || blockNumber == c.forkBlock || parentEpochNumber == currentEpochNumber {
 			parentHeader = currentHeader
 			parentExtra = currentExtra
 
@@ -296,6 +308,15 @@ func (c *checkpointManager) PostBlock(req *PostBlockRequest) error {
 		return fmt.Errorf("could not get last processed block for exit events. Error: %w", err)
 	}
 
+	if lastBlock == 0 {
+		// if we are running in a forked context here we need to make sure that we update the last block
+		// to be that of the fork point, so we don't attempt to handle checkpoints prior to the fork
+		if c.forkBlock > 0 {
+			c.logger.Info("checkpoint store updating last block to handle fork", "lastBlock", lastBlock, "forkBlock", c.forkBlock)
+			lastBlock = c.forkBlock
+		}
+	}
+
 	exitEvents, err := c.eventGetter.getFromBlocks(lastBlock, req.FullBlock)
 	if err != nil {
 		return err
@@ -314,8 +335,19 @@ func (c *checkpointManager) PostBlock(req *PostBlockRequest) error {
 		return err
 	}
 
-	if c.isCheckpointBlock(req.FullBlock.Block.Header.Number, req.IsEpochEndingBlock) &&
-		bytes.Equal(c.key.Address().Bytes(), req.FullBlock.Block.Header.Miner) {
+	isCheckpoint := c.isCheckpointBlock(req.FullBlock.Block.Header.Number, req.IsEpochEndingBlock)
+	isActiveMiner := bytes.Equal(c.key.Address().Bytes(), req.FullBlock.Block.Header.Miner)
+
+	c.logger.Debug("checking to send checkpoint to root chain",
+		"blockNumber", req.FullBlock.Block.Header.Number,
+		"isEpochEndingBlock", req.IsEpochEndingBlock,
+		"isCheckpoint", isCheckpoint,
+		"address", c.key.Address().Bytes(),
+		"miner", req.FullBlock.Block.Header.Miner,
+		"activeMiner", isActiveMiner)
+
+	if isCheckpoint && isActiveMiner {
+		c.logger.Debug("sending checkpoint to rootchain")
 		go func(header *types.Header, epochNumber uint64) {
 			if err := c.submitCheckpoint(header, req.IsEpochEndingBlock); err != nil {
 				c.logger.Warn("failed to submit checkpoint",

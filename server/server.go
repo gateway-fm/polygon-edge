@@ -97,6 +97,9 @@ type Server struct {
 	gasHelper *gasprice.GasHelper
 
 	db storage.Storage
+
+	jsonHub        *jsonRPCHub
+	storeContainer *jsonrpc.StoreContainer
 }
 
 // newFileLogger returns logger instance that writes all logs to a specified file.
@@ -149,7 +152,7 @@ func NewManagedServer(
 	st *itrie.State,
 	db storage.Storage,
 	forkNumber int,
-	atForkPoint bool,
+	storeContainer *jsonrpc.StoreContainer,
 ) (*Server, error) {
 	m := &Server{
 		config:           config,
@@ -160,12 +163,13 @@ func NewManagedServer(
 		state:            st,
 		db:               db,
 		grpcServer:       grpc.NewServer(grpc.UnaryInterceptor(unaryInterceptor)),
+		storeContainer:   storeContainer,
 	}
 
 	m.executor = state.NewExecutor(config.Chain.Params, st, logger)
 	engineName := m.config.Chain.Params.GetEngine()
 	m.engineChecks(engineName)
-	return m.build(engineName, forkNumber, atForkPoint)
+	return m.build(engineName, forkNumber)
 }
 
 // NewServer creates a new Minimal server, using the passed in configuration
@@ -255,13 +259,14 @@ func NewServer(config *Config) (*Server, error) {
 	}
 
 	m.db = db
+	m.storeContainer = jsonrpc.NewStoreContainer(db)
 
 	m.executor = state.NewExecutor(config.Chain.Params, st, logger)
 
 	engineName := m.config.Chain.Params.GetEngine()
 	m.engineChecks(engineName)
 
-	srv, err := m.build(engineName, 0, false)
+	srv, err := m.build(engineName, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -315,7 +320,6 @@ func (m *Server) engineChecks(engineName string) {
 func (m *Server) build(
 	engineName string,
 	forkNumber int,
-	atForkPoint bool,
 ) (*Server, error) {
 	initialStateRoot := types.ZeroHash
 
@@ -345,10 +349,7 @@ func (m *Server) build(
 	// use hooks, but we must execute these after the genesis root calculation
 	// so that this stays true even though we will be adjusting the state root
 	// shortly after
-	isInitialFork := false
-	if forkNumber == 0 {
-		isInitialFork = true
-	}
+	isInitialFork := forkNumber == 0
 
 	// handle the genesis root before we process any additional allocs as these will adjust
 	// the state root throwing out hash checks later on
@@ -434,10 +435,7 @@ func (m *Server) build(
 
 	{
 		// Setup consensus
-		if err := m.setupConsensus(
-			forkNumber > 0,
-			atForkPoint,
-		); err != nil {
+		if err := m.setupConsensus(forkNumber > 0); err != nil {
 			return nil, err
 		}
 		m.blockchain.SetConsensus(m.consensus)
@@ -449,6 +447,21 @@ func (m *Server) build(
 	if err := m.blockchain.ComputeGenesis(forkNumber == 0); err != nil {
 		return nil, err
 	}
+
+	// create the json hub prior to running the endpoint as this server may not be started
+	// in the case of a fork
+	m.jsonHub = &jsonRPCHub{
+		state:              m.state,
+		restoreProgression: m.restoreProgression,
+		Blockchain:         m.blockchain,
+		TxPool:             m.txpool,
+		Executor:           m.executor,
+		Consensus:          m.consensus,
+		Server:             m.network,
+		GasStore:           m.gasHelper,
+	}
+
+	m.storeContainer.AddStore(m.jsonHub, m.config.Chain.Params.StopBlock)
 
 	return m, nil
 }
@@ -613,7 +626,6 @@ func setupSecretsManager(config *Config, logger hclog.Logger) (secrets.SecretsMa
 // setupConsensus sets up the consensus mechanism
 func (s *Server) setupConsensus(
 	fromForked bool,
-	atForkPoint bool,
 ) error {
 	engineName := s.config.Chain.Params.GetEngine()
 	engine, ok := consensusBackends[ConsensusType(engineName)]
@@ -662,7 +674,6 @@ func (s *Server) setupConsensus(
 			BlockTime:             uint64(blockTime.Seconds()),
 			NumBlockConfirmations: s.config.NumBlockConfirmations,
 			FromForked:            fromForked,
-			AtForkPoint:           atForkPoint,
 		},
 	)
 
@@ -714,13 +725,16 @@ type jsonRPCHub struct {
 	restoreProgression *progress.ProgressionWrapper
 
 	consensus.Consensus
-	consensus.BridgeDataProvider
 
 	*blockchain.Blockchain
 	*txpool.TxPool
 	*state.Executor
 	*network.Server
 	gasprice.GasStore
+}
+
+func (j *jsonRPCHub) BridgeDataProvider() consensus.BridgeDataProvider {
+	return j.Consensus.GetBridgeProvider()
 }
 
 func (j *jsonRPCHub) GetPeers() int {
@@ -940,20 +954,8 @@ func (j *jsonRPCHub) GetSyncProgression() *progress.Progression {
 
 // setupJSONRCP sets up the JSONRPC server, using the set configuration
 func (s *Server) setupJSONRPC() error {
-	hub := &jsonRPCHub{
-		state:              s.state,
-		restoreProgression: s.restoreProgression,
-		Blockchain:         s.blockchain,
-		TxPool:             s.txpool,
-		Executor:           s.executor,
-		Consensus:          s.consensus,
-		Server:             s.network,
-		BridgeDataProvider: s.consensus.GetBridgeProvider(),
-		GasStore:           s.gasHelper,
-	}
-
 	conf := &jsonrpc.Config{
-		Store:                    hub,
+		StoreContainer:           s.storeContainer,
 		Addr:                     s.config.JSONRPC.JSONRPCAddr,
 		ChainID:                  uint64(s.config.Chain.Params.ChainID),
 		ChainName:                s.config.Chain.Name,

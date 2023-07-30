@@ -54,7 +54,7 @@ func newValidatorsSnapshotCache(
 func (v *validatorsSnapshotCache) GetSnapshot(
 	blockNumber uint64,
 	parents []*types.Header,
-	latestGenesis uint64,
+	forkBlock uint64,
 ) (validator.AccountSet, error) {
 	v.lock.Lock()
 	defer v.lock.Unlock()
@@ -64,10 +64,13 @@ func (v *validatorsSnapshotCache) GetSnapshot(
 		return nil, err
 	}
 
+	epochToGetSnapshot := extra.Checkpoint.EpochNumber
+
 	epochEndingBlock := true
-	if blockNumber == latestGenesis {
-		// at the fork point so we know we're not ending an epoch here
-		epochEndingBlock = false
+	if blockNumber == forkBlock {
+		// at the fork point so we know we're not ending an epoch here and we need to increase the epoch number so we
+		// store the correct snapshot for validation further down the line
+		epochEndingBlock = true
 	} else {
 		epochEndingBlock, err = isEpochEndingBlock(blockNumber, extra, v.blockchain)
 		if err != nil && !errors.Is(err, blockchain.ErrNoBlock) {
@@ -78,7 +81,6 @@ func (v *validatorsSnapshotCache) GetSnapshot(
 		}
 	}
 
-	epochToGetSnapshot := extra.Checkpoint.EpochNumber
 	if !epochEndingBlock {
 		epochToGetSnapshot--
 	}
@@ -98,7 +100,7 @@ func (v *validatorsSnapshotCache) GetSnapshot(
 	if latestValidatorSnapshot == nil {
 		// Haven't managed to retrieve snapshot for any epoch from the cache.
 		// Build snapshot from the scratch, by applying delta from the genesis block.
-		genesisBlockSnapshot, err := v.computeSnapshot(nil, latestGenesis, parents)
+		genesisBlockSnapshot, err := v.computeSnapshot(nil, forkBlock, parents)
 		if err != nil {
 			return nil, fmt.Errorf("failed to compute snapshot for epoch 0: %w", err)
 		}
@@ -196,6 +198,7 @@ func (v *validatorsSnapshotCache) computeSnapshot(
 
 	if existingSnapshot == nil {
 		snapshot = validator.AccountSet{}
+		snapshotEpoch = 1
 	} else {
 		snapshot = existingSnapshot.Snapshot
 		snapshotEpoch = existingSnapshot.Epoch + 1

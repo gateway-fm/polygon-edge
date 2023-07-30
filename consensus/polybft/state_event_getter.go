@@ -1,10 +1,11 @@
 package polybft
 
 import (
+	"github.com/umbracle/ethgo"
+
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/umbracle/ethgo"
 )
 
 // eventsGetter is a struct for getting missed and current events
@@ -23,7 +24,7 @@ type eventsGetter[T contractsapi.EventAbi] struct {
 // getFromBlocks gets events of specified type from specified blocks
 // and saves them using the provided saveEventsFn
 func (e *eventsGetter[T]) getFromBlocks(lastProcessedBlock uint64,
-	currentBlock *types.FullBlock) ([]T, error) {
+    currentBlock *types.FullBlock) ([]T, error) {
 	var allEvents []T
 
 	for i := lastProcessedBlock + 1; i < currentBlock.Block.Number(); i++ {
@@ -57,7 +58,7 @@ func (e *eventsGetter[T]) getFromBlocks(lastProcessedBlock uint64,
 
 // getEventsFromReceipts returns events of specified type from block transaction receipts
 func (e *eventsGetter[T]) getEventsFromReceipts(blockHeader *types.Header,
-	receipts []*types.Receipt) ([]T, error) {
+    receipts []*types.Receipt) ([]T, error) {
 	var events []T
 
 	for _, receipt := range receipts {

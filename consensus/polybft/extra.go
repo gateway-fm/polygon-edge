@@ -179,6 +179,13 @@ func (i *Extra) ValidateParentSignatures(blockNumber uint64, consensusBackend po
 		return nil
 	}
 
+	// if we're running in a forked context then the magic block won't have signatures either - similar to the first
+	// block after genesis
+	forkBlock := consensusBackend.GetRuntimeForkBlock()
+	if blockNumber <= forkBlock+1 {
+		return nil
+	}
+
 	if i.Parent == nil {
 		return fmt.Errorf("failed to verify signatures for parent of block %d because signatures are not present",
 			blockNumber)
@@ -412,7 +419,8 @@ func (c *CheckpointData) ValidateBasic(parentCheckpoint *CheckpointData) error {
 		c.EpochNumber != parentCheckpoint.EpochNumber+1 {
 		// epoch-beginning block
 		// epoch number must be incremented by one compared to parent block's checkpoint
-		return fmt.Errorf("invalid epoch number for epoch-beginning block")
+		return fmt.Errorf("invalid epoch number for epoch-beginning block, checkpoint number: %v, parent checkpoint number: %v",
+			c.EpochNumber, parentCheckpoint.EpochNumber)
 	}
 
 	if c.CurrentValidatorsHash == types.ZeroHash {

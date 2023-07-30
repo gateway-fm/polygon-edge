@@ -65,7 +65,7 @@ type debugStore interface {
 
 // Debug is the debug jsonrpc endpoint
 type Debug struct {
-	store debugStore
+	storeContainer *StoreContainer
 }
 
 type TraceConfig struct {
@@ -80,29 +80,29 @@ func (d *Debug) TraceBlockByNumber(
 	blockNumber BlockNumber,
 	config *TraceConfig,
 ) (interface{}, error) {
-	num, err := GetNumericBlockNumber(blockNumber, d.store)
+	num, store, err := GetNumericBlockNumber(blockNumber, d.storeContainer)
 	if err != nil {
 		return nil, err
 	}
 
-	block, ok := d.store.GetBlockByNumber(num, true)
+	b, ok := store.GetBlockByNumber(num, true)
 	if !ok {
 		return nil, fmt.Errorf("block %d not found", num)
 	}
 
-	return d.traceBlock(block, config)
+	return d.traceBlock(b, config, store)
 }
 
 func (d *Debug) TraceBlockByHash(
 	blockHash types.Hash,
 	config *TraceConfig,
 ) (interface{}, error) {
-	block, ok := d.store.GetBlockByHash(blockHash, true)
-	if !ok {
-		return nil, fmt.Errorf("block %s not found", blockHash)
+	store, b, err := d.storeContainer.byHash(blockHash, true)
+	if err != nil {
+		return nil, err
 	}
 
-	return d.traceBlock(block, config)
+	return d.traceBlock(b, config, store)
 }
 
 func (d *Debug) TraceBlock(
@@ -114,24 +114,26 @@ func (d *Debug) TraceBlock(
 		return nil, fmt.Errorf("unable to decode block, %w", decodeErr)
 	}
 
-	block := &types.Block{}
-	if err := block.UnmarshalRLP(blockByte); err != nil {
+	b := &types.Block{}
+	if err := b.UnmarshalRLP(blockByte); err != nil {
 		return nil, err
 	}
 
-	return d.traceBlock(block, config)
+	store := d.storeContainer.byNumber(BlockNumber(b.Number()))
+
+	return d.traceBlock(b, config, store)
 }
 
 func (d *Debug) TraceTransaction(
 	txHash types.Hash,
 	config *TraceConfig,
 ) (interface{}, error) {
-	tx, block := GetTxAndBlockByTxHash(txHash, d.store)
-	if tx == nil {
-		return nil, fmt.Errorf("tx %s not found", txHash.String())
+	tx, b, store, err := GetTxAndBlockByTxHash(txHash, d.storeContainer)
+	if err == nil {
+		return nil, err
 	}
 
-	if block.Number() == 0 {
+	if b.Number() == 0 {
 		return nil, ErrTraceGenesisBlock
 	}
 
@@ -142,7 +144,7 @@ func (d *Debug) TraceTransaction(
 
 	defer cancel()
 
-	return d.store.TraceTxn(block, tx.Hash, tracer)
+	return store.TraceTxn(b, tx.Hash, tracer)
 }
 
 func (d *Debug) TraceCall(
@@ -150,12 +152,12 @@ func (d *Debug) TraceCall(
 	filter BlockNumberOrHash,
 	config *TraceConfig,
 ) (interface{}, error) {
-	header, err := GetHeaderFromBlockNumberOrHash(filter, d.store)
+	header, store, err := GetHeaderFromBlockNumberOrHash(filter, d.storeContainer)
 	if err != nil {
 		return nil, ErrHeaderNotFound
 	}
 
-	tx, err := DecodeTxn(arg, header.Number, d.store)
+	tx, err := DecodeTxn(arg, header.Number, d.storeContainer)
 	if err != nil {
 		return nil, err
 	}
@@ -172,12 +174,13 @@ func (d *Debug) TraceCall(
 		return nil, err
 	}
 
-	return d.store.TraceCall(tx, header, tracer)
+	return store.TraceCall(tx, header, tracer)
 }
 
 func (d *Debug) traceBlock(
 	block *types.Block,
 	config *TraceConfig,
+	store JSONRPCStore,
 ) (interface{}, error) {
 	if block.Number() == 0 {
 		return nil, ErrTraceGenesisBlock
@@ -190,7 +193,7 @@ func (d *Debug) traceBlock(
 		return nil, err
 	}
 
-	return d.store.TraceBlock(block, tracer)
+	return store.TraceBlock(block, tracer)
 }
 
 // newTracer creates new tracer by config

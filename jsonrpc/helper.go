@@ -21,25 +21,27 @@ type latestHeaderGetter interface {
 }
 
 // GetNumericBlockNumber returns block number based on current state or specified number
-func GetNumericBlockNumber(number BlockNumber, store latestHeaderGetter) (uint64, error) {
+func GetNumericBlockNumber(number BlockNumber, container *StoreContainer) (uint64, JSONRPCStore, error) {
 	switch number {
 	case LatestBlockNumber, PendingBlockNumber:
+		store := container.latest()
 		latest := store.Header()
 		if latest == nil {
-			return 0, ErrLatestNotFound
+			return 0, nil, ErrLatestNotFound
 		}
 
-		return latest.Number, nil
+		return latest.Number, store, nil
 
 	case EarliestBlockNumber:
-		return 0, nil
+		return 0, container.earliest(), nil
 
 	default:
 		if number < 0 {
-			return 0, ErrNegativeBlockNumber
+			return 0, nil, ErrNegativeBlockNumber
 		}
 
-		return uint64(number), nil
+		store := container.byNumber(number)
+		return uint64(number), store, nil
 	}
 }
 
@@ -49,27 +51,30 @@ type headerGetter interface {
 }
 
 // GetBlockHeader returns a header using the provided number
-func GetBlockHeader(number BlockNumber, store headerGetter) (*types.Header, error) {
+func GetBlockHeader(number BlockNumber, container *StoreContainer) (*types.Header, JSONRPCStore, error) {
 	switch number {
 	case PendingBlockNumber, LatestBlockNumber:
-		return store.Header(), nil
+		store := container.latest()
+		return store.Header(), store, nil
 
 	case EarliestBlockNumber:
+		store := container.earliest()
 		header, ok := store.GetHeaderByNumber(uint64(0))
 		if !ok {
-			return nil, ErrFailedFetchGenesis
+			return nil, nil, ErrFailedFetchGenesis
 		}
 
-		return header, nil
+		return header, store, nil
 
 	default:
+		store := container.byNumber(number)
 		// Convert the block number from hex to uint64
 		header, ok := store.GetHeaderByNumber(uint64(number))
 		if !ok {
-			return nil, fmt.Errorf("error fetching block number %d header", uint64(number))
+			return nil, nil, fmt.Errorf("error fetching block number %d header", uint64(number))
 		}
 
-		return header, nil
+		return header, store, nil
 	}
 }
 
@@ -79,22 +84,26 @@ type txLookupAndBlockGetter interface {
 }
 
 // GetTxAndBlockByTxHash returns the tx and the block including the tx by given tx hash
-func GetTxAndBlockByTxHash(txHash types.Hash, store txLookupAndBlockGetter) (*types.Transaction, *types.Block) {
-	blockHash, ok := store.ReadTxLookup(txHash)
+func GetTxAndBlockByTxHash(txHash types.Hash, container *StoreContainer) (*types.Transaction, *types.Block, JSONRPCStore, error) {
+	// get the latest store as it will have access to all world state
+	latestStore := container.latest()
+
+	blockHash, ok := latestStore.ReadTxLookup(txHash)
 	if !ok {
-		return nil, nil
+		return nil, nil, nil, fmt.Errorf("tx %s not found", txHash.String())
 	}
 
-	block, ok := store.GetBlockByHash(blockHash, true)
-	if !ok {
-		return nil, nil
+	// now we can get the actual block by hash using the container
+	store, b, err := container.byHash(blockHash, false)
+	if err != nil {
+		return nil, nil, nil, err
 	}
 
-	if txn, _ := types.FindTxByHash(block.Transactions, txHash); txn != nil {
-		return txn, block
+	if txn, _ := types.FindTxByHash(b.Transactions, txHash); txn != nil {
+		return txn, b, store, nil
 	}
 
-	return nil, nil
+	return nil, nil, nil, fmt.Errorf("tx %s not found in block", txHash.String())
 }
 
 type blockGetter interface {
@@ -103,7 +112,7 @@ type blockGetter interface {
 	GetBlockByHash(types.Hash, bool) (*types.Block, bool)
 }
 
-func GetHeaderFromBlockNumberOrHash(bnh BlockNumberOrHash, store blockGetter) (*types.Header, error) {
+func GetHeaderFromBlockNumberOrHash(bnh BlockNumberOrHash, container *StoreContainer) (*types.Header, JSONRPCStore, error) {
 	// The filter is empty, use the latest block by default
 	if bnh.BlockNumber == nil && bnh.BlockHash == nil {
 		bnh.BlockNumber, _ = createBlockNumberPointer(latest)
@@ -111,21 +120,21 @@ func GetHeaderFromBlockNumberOrHash(bnh BlockNumberOrHash, store blockGetter) (*
 
 	if bnh.BlockNumber != nil {
 		// block number
-		header, err := GetBlockHeader(*bnh.BlockNumber, store)
+		header, store, err := GetBlockHeader(*bnh.BlockNumber, container)
 		if err != nil {
-			return nil, fmt.Errorf("failed to get the header of block %d: %w", *bnh.BlockNumber, err)
+			return nil, nil, fmt.Errorf("failed to get the header of block %d: %w", *bnh.BlockNumber, err)
 		}
 
-		return header, nil
+		return header, store, nil
 	}
 
 	// block hash
-	block, ok := store.GetBlockByHash(*bnh.BlockHash, false)
-	if !ok {
-		return nil, fmt.Errorf("could not find block referenced by the hash %s", bnh.BlockHash.String())
+	store, b, err := container.byHash(*bnh.BlockHash, false)
+	if err != nil {
+		return nil, nil, fmt.Errorf("could not find block referenced by the hash %s, err %w", bnh.BlockHash.String(), err)
 	}
 
-	return block.Header, nil
+	return b.Header, store, nil
 }
 
 type nonceGetter interface {
@@ -135,18 +144,19 @@ type nonceGetter interface {
 	GetAccount(root types.Hash, addr types.Address) (*Account, error)
 }
 
-func GetNextNonce(address types.Address, number BlockNumber, store nonceGetter) (uint64, error) {
+func GetNextNonce(address types.Address, number BlockNumber, container *StoreContainer) (uint64, error) {
 	if number == PendingBlockNumber {
 		// Grab the latest pending nonce from the TxPool
 		//
 		// If the account is not initialized in the local TxPool,
 		// return the latest nonce from the world state
+		store := container.latest()
 		res := store.GetNonce(address)
 
 		return res, nil
 	}
 
-	header, err := GetBlockHeader(number, store)
+	header, store, err := GetBlockHeader(number, container)
 	if err != nil {
 		return 0, err
 	}
@@ -165,7 +175,7 @@ func GetNextNonce(address types.Address, number BlockNumber, store nonceGetter) 
 	return acc.Nonce, nil
 }
 
-func DecodeTxn(arg *txnArgs, blockNumber uint64, store nonceGetter) (*types.Transaction, error) {
+func DecodeTxn(arg *txnArgs, blockNumber uint64, container *StoreContainer) (*types.Transaction, error) {
 	if arg == nil {
 		return nil, errors.New("missing value for required argument 0")
 	}
@@ -175,7 +185,7 @@ func DecodeTxn(arg *txnArgs, blockNumber uint64, store nonceGetter) (*types.Tran
 		arg.Nonce = argUintPtr(0)
 	} else if arg.Nonce == nil {
 		// get nonce from the pool
-		nonce, err := GetNextNonce(*arg.From, LatestBlockNumber, store)
+		nonce, err := GetNextNonce(*arg.From, LatestBlockNumber, container)
 		if err != nil {
 			return nil, err
 		}

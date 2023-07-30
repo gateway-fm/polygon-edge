@@ -4,12 +4,13 @@ import (
 	"context"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/helper/common"
 	hcf "github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/blocktracker"
 	"github.com/umbracle/ethgo/jsonrpc"
 	"github.com/umbracle/ethgo/tracker"
+
+	"github.com/0xPolygon/polygon-edge/helper/common"
 )
 
 const minBlockMaxBacklog = 96
@@ -84,11 +85,11 @@ func (e *EventTracker) Start(ctx context.Context) error {
 		start := time.Now().UTC()
 		if err := blockTracker.Init(); err != nil {
 			e.logger.Error("failed to init blocktracker", "error", err)
-
 			return err
 		}
 		elapsed := time.Now().UTC().Sub(start)
 
+		// TODO [Palm] - this should be turned back on but needs to handle us not being at genesis
 		// Start
 		if err := blockTracker.Start(); err != nil {
 			if common.IsContextDone(err) {

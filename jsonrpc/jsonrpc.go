@@ -54,16 +54,16 @@ type dispatcher interface {
 // JSONRPCStore defines all the methods required
 // by all the JSON RPC endpoints
 type JSONRPCStore interface {
-	ethStore
+	EthStore
 	networkStore
 	txPoolStore
 	filterManagerStore
-	bridgeStore
 	debugStore
+	bridgeDataFactory
 }
 
 type Config struct {
-	Store                    JSONRPCStore
+	StoreContainer           *StoreContainer
 	Addr                     *net.TCPAddr
 	ChainID                  uint64
 	ChainName                string
@@ -77,7 +77,7 @@ type Config struct {
 func NewJSONRPC(logger hclog.Logger, config *Config) (*JSONRPC, error) {
 	d, err := newDispatcher(
 		logger,
-		config.Store,
+		config.StoreContainer,
 		&dispatcherParams{
 			chainID:                 config.ChainID,
 			chainName:               config.ChainName,

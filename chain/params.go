@@ -38,7 +38,7 @@ type Params struct {
 
 	// once a chain has forked to a new consensus engine the genesis block will effectively not be 0
 	// and will be the block inserted at the fork point
-	LatestGenesis uint64 `json:"latestGenesis,omitempty"`
+	ForkBlock uint64 `json:"forkBlock,omitempty"`
 }
 
 type AddressListConfig struct {

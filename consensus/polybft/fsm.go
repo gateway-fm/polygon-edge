@@ -9,6 +9,9 @@ import (
 
 	"github.com/0xPolygon/go-ibft/messages"
 	"github.com/0xPolygon/go-ibft/messages/proto"
+	"github.com/armon/go-metrics"
+	hcf "github.com/hashicorp/go-hclog"
+
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
@@ -17,8 +20,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/armon/go-metrics"
-	hcf "github.com/hashicorp/go-hclog"
 )
 
 type blockBuilder interface {
@@ -381,7 +382,7 @@ func (f *fsm) Validate(proposal []byte) error {
 			return fmt.Errorf("failed to calculate proposal hash: %w", err)
 		}
 
-		f.logger.Debug("[FSM Validate]", "txs", len(block.Transactions), "proposal hash", checkpointHash)
+		f.logger.Debug("[FSM Validate]", "block", stateBlock.Block.Number(), "txs", len(block.Transactions), "proposal hash", checkpointHash)
 	}
 
 	f.target = stateBlock

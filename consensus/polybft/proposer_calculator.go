@@ -42,12 +42,12 @@ func NewProposerSnapshotFromState(config *runtimeConfig) (*ProposerSnapshot, err
 
 	if snapshot == nil {
 		// pick validator set from genesis block if snapshot is not saved in db
-		genesisValidatorsSet, err := config.polybftBackend.GetValidators(config.latestGenesis, nil)
+		genesisValidatorsSet, err := config.polybftBackend.GetValidators(config.forkBlock, nil)
 		if err != nil {
 			return nil, err
 		}
 
-		snapshot = NewProposerSnapshot(config.latestGenesis+1, genesisValidatorsSet)
+		snapshot = NewProposerSnapshot(config.forkBlock+1, genesisValidatorsSet)
 	}
 
 	return snapshot, nil

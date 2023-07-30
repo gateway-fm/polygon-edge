@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"time"
 
+	hcf "github.com/hashicorp/go-hclog"
+
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
-	hcf "github.com/hashicorp/go-hclog"
 )
 
 //nolint:godox

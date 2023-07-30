@@ -81,8 +81,7 @@ type runtimeConfig struct {
 	bridgeTopic           topic
 	numBlockConfirmations uint64
 	fromForked            bool
-	atForkPoint           bool
-	latestGenesis         uint64
+	forkBlock             uint64
 }
 
 // consensusRuntime is a struct that provides consensus runtime features like epoch, state and event management
@@ -214,7 +213,9 @@ func (c *consensusRuntime) initCheckpointManager(logger hcf.Logger) error {
 			c.config.blockchain,
 			c.config.polybftBackend,
 			logger.Named("checkpoint_manager"),
-			c.state)
+			c.state,
+			c.config.forkBlock,
+		)
 	} else {
 		c.checkpointManager = &dummyCheckpointManager{}
 	}
@@ -238,6 +239,7 @@ func (c *consensusRuntime) initStakeManager(logger hcf.Logger) error {
 		c.config.PolyBFTConfig.Bridge.CustomSupernetManagerAddr,
 		c.config.blockchain,
 		int(c.config.PolyBFTConfig.MaxValidatorSetSize),
+		c.config.forkBlock,
 	)
 
 	return nil
@@ -320,9 +322,13 @@ func (c *consensusRuntime) OnBlockInserted(fullBlock *types.FullBlock) {
 	if isEndOfEpoch {
 		if epoch, err = c.restartEpoch(fullBlock.Block.Header); err != nil {
 			c.logger.Error("failed to restart epoch after block inserted", "error", err)
-
 			return
 		}
+
+		// PALM HACK - testing something out - remove - I don't think state is being updated at the end of an epoch properly
+		//epoch.Number++
+
+		c.logger.Debug("onBlockInserted after restartEpoch", "epoch", epoch.Number)
 	}
 
 	// finally update runtime state (lastBuiltBlock, epoch, proposerSnapshot)
@@ -432,6 +438,8 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) (*epochMetadata, e
 		return nil, fmt.Errorf("get epoch: %w", err)
 	}
 
+	c.logger.Debug("restartEpoch", "epochNumber", epochNumber)
+
 	if lastEpoch != nil {
 		// Epoch might be already in memory, if its the same number do nothing -> just return provided last one
 		// Otherwise, reset the epoch metadata and restart the async services
@@ -450,14 +458,9 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) (*epochMetadata, e
 		Validators: validatorSet,
 	})
 
-	var firstBlockInEpoch uint64
-	if c.config.atForkPoint {
-		firstBlockInEpoch = header.Number + 1
-	} else {
-		firstBlockInEpoch, err = c.getFirstBlockOfEpoch(epochNumber, header)
-		if err != nil {
-			return nil, err
-		}
+	firstBlockInEpoch, err := c.getFirstBlockOfEpoch(epochNumber, header)
+	if err != nil {
+		return nil, err
 	}
 
 	if err := c.state.EpochStore.cleanEpochsFromDB(); err != nil {
@@ -474,6 +477,7 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) (*epochMetadata, e
 		"epoch", epochNumber,
 		"validators", validatorSet.Len(),
 		"firstBlockInEpoch", firstBlockInEpoch,
+		"forkBlock", c.config.forkBlock,
 	)
 
 	reqObj := &PostEpochRequest{
@@ -503,8 +507,7 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) (*epochMetadata, e
 func (c *consensusRuntime) calculateCommitEpochInput(
 	currentBlock *types.Header,
 	epoch *epochMetadata,
-) (*contractsapi.CommitEpochValidatorSetFn,
-	*contractsapi.DistributeRewardForRewardPoolFn, error) {
+) (*contractsapi.CommitEpochValidatorSetFn, *contractsapi.DistributeRewardForRewardPoolFn, error) {
 	uptimeCounter := map[types.Address]int64{}
 	blockHeader := currentBlock
 	epochID := epoch.Number
@@ -532,6 +535,12 @@ func (c *consensusRuntime) calculateCommitEpochInput(
 
 	// calculate uptime for current epoch
 	for blockHeader.Number > epoch.FirstBlockInEpoch {
+		if blockHeader.Number-1 <= c.config.forkBlock {
+			// we have reached a forked genesis point so can stop calculating uptime
+			c.logger.Info("epoch uptime calculation loop stopped due to hitting forked genesis point")
+			break
+		}
+
 		if err := getSealersForBlock(blockExtra, epoch.Validators); err != nil {
 			return nil, nil, err
 		}
@@ -544,7 +553,9 @@ func (c *consensusRuntime) calculateCommitEpochInput(
 
 	// calculate uptime for blocks from previous epoch that were not processed in previous uptime
 	// since we can not calculate uptime for the last block in epoch (because of parent signatures)
-	if blockHeader.Number > commitEpochLookbackSize {
+	// this needs to take into account any fork points also as blocks prior to the fork will not
+	// have the expected data in them for polybft
+	if blockHeader.Number > commitEpochLookbackSize+c.config.forkBlock {
 		for i := 0; i < commitEpochLookbackSize; i++ {
 			validators, err := c.config.polybftBackend.GetValidators(blockHeader.Number-2, nil)
 			if err != nil {
@@ -582,11 +593,19 @@ func (c *consensusRuntime) calculateCommitEpochInput(
 		}
 	}
 
+	c.logger.Debug("calculateCommitEpochInput",
+		"epochId", epochID,
+		"startBlock", epoch.FirstBlockInEpoch-c.config.forkBlock,
+		"startBlockReal", epoch.FirstBlockInEpoch,
+		"endBlock", currentBlock.Number+1-c.config.forkBlock,
+		"endBlockReal", currentBlock.Number+1,
+	)
+
 	commitEpoch := &contractsapi.CommitEpochValidatorSetFn{
 		ID: new(big.Int).SetUint64(epochID),
 		Epoch: &contractsapi.Epoch{
-			StartBlock: new(big.Int).SetUint64(epoch.FirstBlockInEpoch),
-			EndBlock:   new(big.Int).SetUint64(currentBlock.Number + 1),
+			StartBlock: new(big.Int).SetUint64(epoch.FirstBlockInEpoch - c.config.forkBlock),
+			EndBlock:   new(big.Int).SetUint64(currentBlock.Number + 1 - c.config.forkBlock),
 			EpochRoot:  types.Hash{},
 		},
 	}
@@ -935,6 +954,10 @@ func (c *consensusRuntime) getFirstBlockOfEpoch(epochNumber uint64, latestHeader
 		return 1, nil
 	}
 
+	if c.config.forkBlock == latestHeader.Number {
+		return latestHeader.Number + 1, nil
+	}
+
 	blockHeader := latestHeader
 
 	blockExtra, err := GetIbftExtra(latestHeader.ExtraData)
@@ -955,7 +978,6 @@ func (c *consensusRuntime) getFirstBlockOfEpoch(epochNumber uint64, latestHeader
 	for blockExtra.Checkpoint.EpochNumber == epoch {
 		firstBlockInEpoch = blockHeader.Number
 		blockHeader, blockExtra, err = getBlockData(blockHeader.Number-1, c.config.blockchain)
-
 		if err != nil {
 			return 0, err
 		}

@@ -13,12 +13,12 @@ var HeaderHashWithoutSeals func(h *Header) Hash
 // In IBFT, this header hash method is substituted
 // for Istanbul Header Hash calculation
 func init() {
-	HeaderHash = defHeaderHash
+	ResetHeaderHash()
 }
 
 var marshalArenaPool fastrlp.ArenaPool
 
-func defHeaderHash(h *Header) (hash Hash) {
+func DefaultHeaderHash(h *Header) (hash Hash) {
 	// default header hashing
 	ar := marshalArenaPool.Get()
 	hasher := keccak.DefaultKeccakPool.Get()
@@ -30,6 +30,10 @@ func defHeaderHash(h *Header) (hash Hash) {
 	keccak.DefaultKeccakPool.Put(hasher)
 
 	return
+}
+
+func ResetHeaderHash() {
+	HeaderHash = DefaultHeaderHash
 }
 
 // ComputeHash computes the hash of the header

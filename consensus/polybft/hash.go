@@ -12,7 +12,7 @@ var setupHeaderHashFuncOnce sync.Once
 // because of the extraData field
 func setupHeaderHashFunc() {
 	setupHeaderHashFuncOnce.Do(func() {
-		originalHeaderHash := types.HeaderHash
+		originalHeaderHash := types.DefaultHeaderHash
 
 		types.HeaderHash = func(h *types.Header) types.Hash {
 			// when hashing the block for signing we have to remove from
@@ -29,4 +29,17 @@ func setupHeaderHashFunc() {
 			return originalHeaderHash(hh)
 		}
 	})
+}
+
+func headerHashFunction(h *types.Header) types.Hash {
+	extra, err := GetIbftExtraClean(h.ExtraData)
+	if err != nil {
+		return types.ZeroHash
+	}
+
+	// override extra data without seals and committed seal items
+	hh := h.Copy()
+	hh.ExtraData = extra
+
+	return types.DefaultHeaderHash(hh)
 }

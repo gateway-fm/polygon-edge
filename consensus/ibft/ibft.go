@@ -178,7 +178,8 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 	}
 
 	// Istanbul requires a different header hash function
-	p.SetHeaderHash()
+	consensus.DefaultHashStore.RegisterNewHasher(p.calculateHeaderHash, params.Config.Params.StopBlock)
+
 	p.SetHeaderWithoutSealsHash()
 	p.SetHelperHeaderHash()
 
@@ -564,21 +565,23 @@ func (i *backendIBFT) Close() error {
 	return nil
 }
 
+func (i *backendIBFT) calculateHeaderHash(h *types.Header) types.Hash {
+	sig, err := i.forkManager.GetSigner(h.Number)
+	if err != nil {
+		return types.ZeroHash
+	}
+
+	hash, err := sig.CalculateHeaderHash(h, signer.ExcludeRoundAndCommitSeals)
+	if err != nil {
+		return types.ZeroHash
+	}
+
+	return hash
+}
+
 // SetHeaderHash updates hash calculation function for IBFT
 func (i *backendIBFT) SetHeaderHash() {
-	types.HeaderHash = func(h *types.Header) types.Hash {
-		sig, err := i.forkManager.GetSigner(h.Number)
-		if err != nil {
-			return types.ZeroHash
-		}
-
-		hash, err := sig.CalculateHeaderHash(h, signer.ExcludeRoundAndCommitSeals)
-		if err != nil {
-			return types.ZeroHash
-		}
-
-		return hash
-	}
+	types.HeaderHash = i.calculateHeaderHash
 }
 
 func (i *backendIBFT) SetHeaderWithoutSealsHash() {

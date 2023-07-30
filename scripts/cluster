@@ -272,7 +272,7 @@ case "$2" in
     jq '.params.engineForks[1].alloc = input' genesis-palm-merge.json genesis-alloc.json > genesis-merge.json && \
     jq 'del(.genesis.alloc)' genesis.json > genesis-no-alloc.json && \
     jq -n 'reduce inputs as $i ({}; . * $i)' genesis-no-alloc.json genesis-merge.json > genesis-merged.json && \
-#    rm -f genesis.json && rm -f genesis-no-alloc.json && rm -f genesis-alloc.json && rm -f genesis-merge.json &&  \
+    rm -f genesis.json && rm -f genesis-no-alloc.json && rm -f genesis-alloc.json && rm -f genesis-merge.json &&  \
     mv genesis-merged.json genesis.json
 
     startServerFromBinary $2

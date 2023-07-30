@@ -6,9 +6,10 @@ import (
 	"net"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/0xPolygon/polygon-edge/helper/tests"
 	"github.com/0xPolygon/polygon-edge/versioning"
-	"github.com/stretchr/testify/assert"
 
 	"github.com/hashicorp/go-hclog"
 )
@@ -21,9 +22,12 @@ func TestHTTPServer(t *testing.T) {
 		t.Fatalf("Unable to fetch free port, %v", portErr)
 	}
 
+	container := NewStoreContainer(nil)
+	container.AddStore(store, nil)
+
 	config := &Config{
-		Store: store,
-		Addr:  &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: port},
+		StoreContainer: container,
+		Addr:           &net.TCPAddr{IP: net.ParseIP("127.0.0.1"), Port: port},
 	}
 	_, err := NewJSONRPC(hclog.NewNullLogger(), config)
 

@@ -80,7 +80,6 @@ type Params struct {
 
 	NumBlockConfirmations uint64
 	FromForked            bool
-	AtForkPoint           bool
 }
 
 // Factory is the factory function to create a discovery consensus

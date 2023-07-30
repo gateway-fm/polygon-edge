@@ -42,13 +42,15 @@ var (
 type polybftBackend interface {
 	// GetValidators retrieves validator set for the given block
 	GetValidators(blockNumber uint64, parents []*types.Header) (validator.AccountSet, error)
+
+	GetRuntimeForkBlock() uint64
 }
 
 // Factory is the factory function to create a discovery consensus
 func Factory(params *consensus.Params) (consensus.Consensus, error) {
 	logger := params.Logger.Named("polybft")
 
-	setupHeaderHashFunc()
+	consensus.DefaultHashStore.RegisterNewHasher(headerHashFunction, params.Config.Params.StopBlock)
 
 	polybft := &Polybft{
 		config:  params,
@@ -534,8 +536,7 @@ func (p *Polybft) initRuntime() error {
 		bridgeTopic:           p.bridgeTopic,
 		numBlockConfirmations: p.config.NumBlockConfirmations,
 		fromForked:            p.config.FromForked,
-		atForkPoint:           p.config.AtForkPoint,
-		latestGenesis:         p.config.Config.Params.LatestGenesis,
+		forkBlock:             p.config.Config.Params.ForkBlock,
 	}
 
 	runtime, err := newConsensusRuntime(p.logger, runtimeConfig)
@@ -710,7 +711,11 @@ func (p *Polybft) verifyHeaderImpl(parent, header *types.Header, blockTimeDrift 
 }
 
 func (p *Polybft) GetValidators(blockNumber uint64, parents []*types.Header) (validator.AccountSet, error) {
-	return p.validatorsCache.GetSnapshot(blockNumber, parents, p.config.Config.Params.LatestGenesis)
+	// if we're running in a forked context then there will be no validator info for polybft before the fork point
+	if blockNumber < p.config.Config.Params.ForkBlock {
+		return []*validator.ValidatorMetadata{}, nil
+	}
+	return p.validatorsCache.GetSnapshot(blockNumber, parents, p.config.Config.Params.ForkBlock)
 }
 
 // ProcessHeaders updates the snapshot based on the verified headers
@@ -774,4 +779,8 @@ func (p *Polybft) GetBridgeProvider() consensus.BridgeDataProvider {
 // Filters extra data to not contain Committed field
 func (p *Polybft) FilterExtra(extra []byte) ([]byte, error) {
 	return GetIbftExtraClean(extra)
+}
+
+func (p *Polybft) GetRuntimeForkBlock() uint64 {
+	return p.runtime.config.forkBlock
 }

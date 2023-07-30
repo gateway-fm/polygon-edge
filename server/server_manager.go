@@ -12,9 +12,11 @@ import (
 	"github.com/0xPolygon/polygon-edge/blockchain/storage/leveldb"
 	"github.com/0xPolygon/polygon-edge/blockchain/storage/memory"
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/helper/common"
+	"github.com/0xPolygon/polygon-edge/jsonrpc"
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/state"
 	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
@@ -41,6 +43,7 @@ type Manager struct {
 	originalEngineConfig map[string]interface{}
 	nextFork             *uint64
 	currentHeader        *types.Header
+	storeContainer       *jsonrpc.StoreContainer
 }
 
 func NewManager(cfg *Config) (*Manager, error) {
@@ -95,6 +98,7 @@ func NewManager(cfg *Config) (*Manager, error) {
 		}
 	}
 	m.db = db
+	m.storeContainer = jsonrpc.NewStoreContainer(db)
 
 	// setup secrets
 	secretsManager, err := setupSecretsManager(cfg, m.logger)
@@ -117,11 +121,16 @@ func NewManager(cfg *Config) (*Manager, error) {
 }
 
 func (m *Manager) Start() error {
+	// the default hash store here will manage forked consensus engines and the
+	// way they handle hashing of headers.  Each different engine as part of its factory
+	// startup method will register itself in this instance
+	consensus.DefaultHashStore.RegisterSelfAsHandler()
+
 	// first analyse the forks and see if we need to do anything or just load up the default server
 	if len(m.Config.Chain.Params.EngineForks) == 0 {
 		m.logger.Info("no forks detected, running in simple mode")
 		// no forks, just start the default server
-		srv, err := m.createServer(m.Config, 0, false)
+		srv, err := m.createServer(m.Config, 0)
 		if err != nil {
 			return err
 		}
@@ -144,7 +153,6 @@ func (m *Manager) Start() error {
 func (m *Manager) createServer(
 	config *Config,
 	forkNumber int,
-	atForkPoint bool,
 ) (*Server, error) {
 	return NewManagedServer(
 		config,
@@ -155,7 +163,7 @@ func (m *Manager) createServer(
 		m.state,
 		m.db,
 		forkNumber,
-		atForkPoint,
+		m.storeContainer,
 	)
 }
 
@@ -189,67 +197,55 @@ func (m *Manager) loadNextFork() error {
 	forkNumber := -1
 	for _, fork := range forks {
 		forkNumber++
+
+		// found the one we want - so now to manipulate the config for creating the server
+		// starting with the engine config
+		m.nextFork = fork.To
+		var found = false
+		newEngineParams := make(map[string]interface{})
+		for key, value := range m.originalEngineConfig {
+			if key == fork.Engine {
+				found = true
+				newEngineParams[key] = value
+				break
+			}
+		}
+		if !found {
+			return fmt.Errorf("failed to find engine %s in config", fork.Engine)
+		}
+
+		// overwrite the engine params with the new one only containing details for the active engine
+		m.Config.Chain.Params.Engine = newEngineParams
+
+		if err := m.handleForkGenesisOverrides(fork); err != nil {
+			return err
+		}
+
+		if fork.To == nil {
+			m.logger.Info("server manager loading engine fork", "engine", fork.Engine, "block", "nil")
+		} else {
+			m.logger.Info("server manager loading engine fork", "engine", fork.Engine, "block", *fork.To)
+		}
+
+		lastFork := m.getLastFork(forkNumber, forks)
+
+		// ensure that the stop block is set.  This will help the syncer to stop at the correct height
+		// and ensures that any delay in the stop channel being closed won't cause the chain to run on
+		// beyond the fork point
+		m.Config.Chain.Params.StopBlock = fork.To
+
+		// create the server for side effects even if we don't intend on running it
+		srv, err := m.createServer(m.Config, forkNumber)
+		if err != nil {
+			return err
+		}
+
 		if fork.To == nil || (fork.To != nil && head < *fork.To) {
-			// found the one we want - so now to manipulate the config for creating the server
-			// starting with the engine config
-			m.nextFork = fork.To
-			var found = false
-			newEngineParams := make(map[string]interface{})
-			for key, value := range m.originalEngineConfig {
-				if key == fork.Engine {
-					found = true
-					newEngineParams[key] = value
-					break
-				}
-			}
-			if !found {
-				return fmt.Errorf("failed to find engine %s in config", fork.Engine)
-			}
-
-			// overwrite the engine params with the new one only containing details for the active
-			// engine
-			m.Config.Chain.Params.Engine = newEngineParams
-
-			if err := m.handleForkGenesisOverrides(fork); err != nil {
-				return err
-			}
-
-			if fork.To == nil {
-				m.logger.Info("server manager loading engine fork", "engine", fork.Engine, "block", "nil")
-			} else {
-				m.logger.Info("server manager loading engine fork", "engine", fork.Engine, "block", *fork.To)
-			}
-
-			// ensure that the stop block is set.  This will help the syncer to stop at the correct height
-			// and ensures that any delay in the stop channel being closed won't cause the chain to run on
-			// beyond the fork point
-			m.Config.Chain.Params.StopBlock = fork.To
-
-			var lastFork chain.EngineFork
-			exactForkPoint := false
-			if forkNumber > 0 {
-				lastFork = forks[forkNumber-1]
-				if lastFork.To != nil && head == *lastFork.To {
-					exactForkPoint = true
-				}
-				to := *lastFork.To
-				m.Config.Chain.Params.LatestGenesis = to + 1
-			}
-
-			srv, err := m.createServer(
-				m.Config,
-				forkNumber,
-				exactForkPoint,
-			)
-			if err != nil {
-				return err
-			}
-
 			// only insert the fork block if we are at the exact fork point - we need to do this
 			// after creating the server so the correct hashing algo is used for the block
 			if forkNumber > 0 && lastFork.To != nil && head == *lastFork.To {
 				if fork.Engine == "polybft" {
-					err = m.insertPolybftForkBlock(fork, header, srv.blockchain)
+					err = m.insertPolybftForkBlock(fork, header, srv.blockchain, srv.executor)
 					if err != nil {
 						return err
 					}
@@ -270,6 +266,16 @@ func (m *Manager) loadNextFork() error {
 	}
 
 	return nil
+}
+
+func (m *Manager) getLastFork(forkNumber int, forks []chain.EngineFork) chain.EngineFork {
+	var lastFork chain.EngineFork
+	if forkNumber > 0 {
+		lastFork = forks[forkNumber-1]
+		to := *lastFork.To
+		m.Config.Chain.Params.ForkBlock = to + 1
+	}
+	return lastFork
 }
 
 func (m *Manager) handleForkGenesisOverrides(fork chain.EngineFork) error {
@@ -309,6 +315,7 @@ func (m *Manager) insertPolybftForkBlock(
 	fork chain.EngineFork,
 	currentHeader *types.Header,
 	blockchain *blockchain.Blockchain,
+	executor *state.Executor,
 ) error {
 	if fork.Alloc == nil {
 		// only interested if the fork block has allocs so we can handle the state root changees for them
@@ -329,13 +336,11 @@ func (m *Manager) insertPolybftForkBlock(
 		return nil
 	}
 
-	executor := state.NewExecutor(m.Config.Chain.Params, m.state, m.logger)
 	newStateRoot, err := executor.WriteGenesis(fork.Alloc, currentHeader.StateRoot, true)
 	if err != nil {
 		return err
 	}
 
-	// get the polybft config
 	polyCfg, err := polybft.GetPolyBFTConfig(m.Config.Chain)
 	if err != nil {
 		return err
@@ -360,8 +365,11 @@ func (m *Manager) insertPolybftForkBlock(
 
 	extraData := polybft.Extra{
 		Validators: vsd,
-		Parent:     nil,
-		Committed:  &polybft.Signature{},
+		Parent: &polybft.Signature{
+			AggregatedSignature: []byte{},
+			Bitmap:              []byte{},
+		},
+		Committed: &polybft.Signature{},
 		Checkpoint: &polybft.CheckpointData{
 			BlockRound:            1,
 			EpochNumber:           1,
@@ -403,7 +411,7 @@ func (m *Manager) insertPolybftForkBlock(
 
 	fb := types.FullBlock{
 		Block:    block,
-		Receipts: nil,
+		Receipts: []*types.Receipt{},
 	}
 
 	return blockchain.WriteFullBlock(&fb, "server_manager")
@@ -424,8 +432,14 @@ func (m *Manager) monitorForNextFork() {
 
 			header := ev.Header()
 			m.currentHeader = header
-			m.logger.Debug("server manager monitored block", "number", header.Number, "next fork", *m.nextFork)
-			if header.Number >= *m.nextFork {
+
+			if m.nextFork != nil {
+				m.logger.Debug("server manager monitored block", "number", header.Number, "next fork", *m.nextFork)
+			} else {
+				m.logger.Debug("server manager monitored block", "number", header.Number, "next fork", "nil")
+			}
+
+			if m.nextFork != nil && header.Number >= *m.nextFork {
 				m.logger.Info("server manager reached next fork", "number", header.Number, "next fork", *m.nextFork)
 				// we have reached the next fork point so stop the active server and create the next one
 				m.active.Close()

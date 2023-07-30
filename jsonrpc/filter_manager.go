@@ -243,7 +243,7 @@ type FilterManager struct {
 
 	timeout time.Duration
 
-	store           filterManagerStore
+	storeContainer  *StoreContainer
 	subscription    blockchain.Subscription
 	blockStream     *blockStream
 	blockRangeLimit uint64
@@ -255,11 +255,11 @@ type FilterManager struct {
 	closeCh  chan struct{}
 }
 
-func NewFilterManager(logger hclog.Logger, store filterManagerStore, blockRangeLimit uint64) *FilterManager {
+func NewFilterManager(logger hclog.Logger, container *StoreContainer, blockRangeLimit uint64) *FilterManager {
 	m := &FilterManager{
 		logger:          logger.Named("filter"),
 		timeout:         defaultTimeout,
-		store:           store,
+		storeContainer:  container,
 		blockRangeLimit: blockRangeLimit,
 		filters:         make(map[string]filter),
 		timeouts:        timeHeapImpl{},
@@ -268,11 +268,12 @@ func NewFilterManager(logger hclog.Logger, store filterManagerStore, blockRangeL
 	}
 
 	// start blockstream with the current header
-	header := store.Header()
+	latestStore := container.latest()
+	header := latestStore.Header()
 
 	//nolint:godox
 	// TODO: Make Header return jsonrpc.block object directly (to be fixed in EVM-524)
-	td, ok := store.GetTotalDifficulty(header.Hash)
+	td, ok := latestStore.GetTotalDifficulty(header.Hash)
 	if !ok {
 		td = new(big.Int).SetUint64(header.Difficulty)
 	}
@@ -280,7 +281,7 @@ func NewFilterManager(logger hclog.Logger, store filterManagerStore, blockRangeL
 	m.blockStream = newBlockStream(block)
 
 	// start the head watcher
-	m.subscription = store.SubscribeEvents()
+	m.subscription = latestStore.SubscribeEvents()
 
 	return m
 }
@@ -379,7 +380,12 @@ func (f *FilterManager) Exists(id string) bool {
 }
 
 func (f *FilterManager) getLogsFromBlock(query *LogQuery, block *types.Block) ([]*Log, error) {
-	receipts, err := f.store.GetReceiptsByHash(block.Header.Hash)
+	store, _, err := f.storeContainer.byHash(block.Header.Hash, false)
+	if err != nil {
+		return nil, err
+	}
+
+	receipts, err := store.GetReceiptsByHash(block.Header.Hash)
 	if err != nil {
 		return nil, err
 	}
@@ -410,12 +416,14 @@ func (f *FilterManager) getLogsFromBlock(query *LogQuery, block *types.Block) ([
 }
 
 func (f *FilterManager) getLogsFromBlocks(query *LogQuery) ([]*Log, error) {
-	from, err := GetNumericBlockNumber(query.fromBlock, f.store)
+	// here we aren't supporting making queries that would happen across stores so we just
+	// use the earliest block store
+	from, store, err := GetNumericBlockNumber(query.fromBlock, f.storeContainer)
 	if err != nil {
 		return nil, err
 	}
 
-	to, err := GetNumericBlockNumber(query.toBlock, f.store)
+	to, _, err := GetNumericBlockNumber(query.toBlock, f.storeContainer)
 	if err != nil {
 		return nil, err
 	}
@@ -438,17 +446,17 @@ func (f *FilterManager) getLogsFromBlocks(query *LogQuery) ([]*Log, error) {
 	logs := make([]*Log, 0)
 
 	for i := from; i <= to; i++ {
-		block, ok := f.store.GetBlockByNumber(i, true)
+		b, ok := store.GetBlockByNumber(i, true)
 		if !ok {
 			break
 		}
 
-		if len(block.Transactions) == 0 {
+		if len(b.Transactions) == 0 {
 			// do not check logs if no txs
 			continue
 		}
 
-		blockLogs, err := f.getLogsFromBlock(query, block)
+		blockLogs, err := f.getLogsFromBlock(query, b)
 		if err != nil {
 			return nil, err
 		}
@@ -462,18 +470,17 @@ func (f *FilterManager) getLogsFromBlocks(query *LogQuery) ([]*Log, error) {
 // GetLogsForQuery return array of logs for given query
 func (f *FilterManager) GetLogsForQuery(query *LogQuery) ([]*Log, error) {
 	if query.BlockHash != nil {
-		// BlockHash is set -> fetch logs from this block only
-		block, ok := f.store.GetBlockByHash(*query.BlockHash, true)
-		if !ok {
-			return nil, ErrBlockNotFound
+		_, b, err := f.storeContainer.byHash(*query.BlockHash, false)
+		if err != nil {
+			return nil, err
 		}
 
-		if len(block.Transactions) == 0 {
+		if len(b.Transactions) == 0 {
 			// no txs in block, return empty response
 			return []*Log{}, nil
 		}
 
-		return f.getLogsFromBlock(query, block)
+		return f.getLogsFromBlock(query, b)
 	}
 
 	// gets logs from a range of blocks
@@ -647,26 +654,30 @@ func (f *FilterManager) processEvent(evnt *blockchain.Event) {
 	f.RLock()
 	defer f.RUnlock()
 
+	// events should only appear from the latest loaded consensus fork so use the latest
+	// store
+	store := f.storeContainer.latest()
+
 	for _, header := range evnt.NewChain {
-		td, ok := f.store.GetTotalDifficulty(header.Hash)
+		td, ok := store.GetTotalDifficulty(header.Hash)
 		if !ok {
 			td = new(big.Int).SetUint64(header.Difficulty)
 		}
-		block := toBlock(&types.Block{Header: header}, false, td)
+		b := toBlock(&types.Block{Header: header}, false, td)
 
 		// first include all the new headers in the blockstream for BlockFilter
-		f.blockStream.push(block)
+		f.blockStream.push(b)
 
 		// process new chain to include new logs for LogFilter
-		if processErr := f.appendLogsToFilters(block); processErr != nil {
+		if processErr := f.appendLogsToFilters(b, store); processErr != nil {
 			f.logger.Error(fmt.Sprintf("Unable to process block, %v", processErr))
 		}
 	}
 }
 
 // appendLogsToFilters makes each LogFilters append logs in the header
-func (f *FilterManager) appendLogsToFilters(header *block) error {
-	receipts, err := f.store.GetReceiptsByHash(header.Hash)
+func (f *FilterManager) appendLogsToFilters(header *block, store JSONRPCStore) error {
+	receipts, err := store.GetReceiptsByHash(header.Hash)
 	if err != nil {
 		return err
 	}
@@ -684,7 +695,7 @@ func (f *FilterManager) appendLogsToFilters(header *block) error {
 		return nil
 	}
 
-	block, ok := f.store.GetBlockByHash(header.Hash, true)
+	b, ok := store.GetBlockByHash(header.Hash, true)
 	if !ok {
 		f.logger.Error("could not find block in store", "hash", header.Hash.String())
 
@@ -694,7 +705,7 @@ func (f *FilterManager) appendLogsToFilters(header *block) error {
 	for indx, receipt := range receipts {
 		if receipt.TxHash == types.ZeroHash {
 			// Extract tx Hash
-			receipt.TxHash = block.Transactions[indx].Hash
+			receipt.TxHash = b.Transactions[indx].Hash
 		}
 		// check the logs with the filters
 		for _, log := range receipt.Logs {

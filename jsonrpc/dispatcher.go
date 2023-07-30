@@ -67,7 +67,7 @@ func (dp dispatcherParams) isExceedingBatchLengthLimit(value uint64) bool {
 
 func newDispatcher(
 	logger hclog.Logger,
-	store JSONRPCStore,
+	storeContainer *StoreContainer,
 	params *dispatcherParams,
 ) (*Dispatcher, error) {
 	d := &Dispatcher{
@@ -75,28 +75,33 @@ func newDispatcher(
 		params: params,
 	}
 
-	if store != nil {
-		d.filterManager = NewFilterManager(logger, store, params.blockRangeLimit)
+	if storeContainer != nil {
+		d.filterManager = NewFilterManager(logger, storeContainer, params.blockRangeLimit)
 		go d.filterManager.Run()
 	}
 
-	if err := d.registerEndpoints(store); err != nil {
+	if err := d.registerEndpoints(storeContainer); err != nil {
 		return nil, err
 	}
 
 	return d, nil
 }
 
-func (d *Dispatcher) registerEndpoints(store JSONRPCStore) error {
+func (d *Dispatcher) registerEndpoints(container *StoreContainer) error {
 	d.endpoints.Eth = &Eth{
 		d.logger,
-		store,
 		d.params.chainID,
 		d.filterManager,
 		d.params.priceLimit,
+		container,
 	}
+
+	// some endpoints do not need to handle history and only care about the latest store using the latest consensus
+	// so we can just pass these as needed
+	latestStore := container.latest()
+
 	d.endpoints.Net = &Net{
-		store,
+		latestStore,
 		d.params.chainID,
 	}
 	d.endpoints.Web3 = &Web3{
@@ -104,13 +109,13 @@ func (d *Dispatcher) registerEndpoints(store JSONRPCStore) error {
 		d.params.chainName,
 	}
 	d.endpoints.TxPool = &TxPool{
-		store,
+		latestStore,
 	}
 	d.endpoints.Bridge = &Bridge{
-		store,
+		latestStore,
 	}
 	d.endpoints.Debug = &Debug{
-		store,
+		container,
 	}
 
 	var err error
