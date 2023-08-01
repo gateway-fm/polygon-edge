@@ -9,15 +9,16 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/armon/go-metrics"
+	"github.com/hashicorp/go-hclog"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"google.golang.org/protobuf/types/known/emptypb"
+
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/network"
 	"github.com/0xPolygon/polygon-edge/network/event"
 	"github.com/0xPolygon/polygon-edge/syncer/proto"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/armon/go-metrics"
-	"github.com/hashicorp/go-hclog"
-	"github.com/libp2p/go-libp2p/core/peer"
-	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 const (
@@ -253,6 +254,13 @@ func (m *syncPeerClient) startNewBlockProcess() {
 
 		if l := len(event.NewChain); l > 0 {
 			latest := event.NewChain[l-1]
+
+			select {
+			case <-m.closeCh:
+				return
+			default:
+			}
+
 			// Publish status
 			if err := m.topic.Publish(&proto.SyncPeerStatus{
 				Number: latest.Number,

@@ -146,7 +146,17 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 		time.Duration(params.BlockTime)*3*time.Second,
 	)
 
-	if params.Blockchain.Config().IsPalm() {
+	isPalm := params.Blockchain.Config().IsPalm()
+	hasDevP2pPeers := false
+	peers, ok := params.Config.Config["devp2p-peers"]
+	if ok {
+		p, ok := peers.([]string)
+		if ok && len(p) > 0 {
+			hasDevP2pPeers = true
+		}
+	}
+
+	if isPalm && hasDevP2pPeers {
 		sync = syncer.NewPalmSyncer(
 			logger,
 			params.Config,

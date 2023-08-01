@@ -3,6 +3,7 @@ package syncer
 import (
 	"errors"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/armon/go-metrics"
@@ -39,6 +40,9 @@ type syncer struct {
 
 	// Channel to notify Sync that a new status arrived
 	newStatusCh chan struct{}
+
+	// stopping flag
+	stopping atomic.Bool
 }
 
 func NewSyncer(
@@ -77,6 +81,7 @@ func (s *syncer) Start() error {
 
 // Close terminates goroutine processes
 func (s *syncer) Close() error {
+	s.stopping.Store(true)
 	close(s.newStatusCh)
 
 	if err := s.syncPeerService.Close(); err != nil {
@@ -97,7 +102,9 @@ func (s *syncer) initializePeerMap() {
 // startPeerStatusUpdateProcess subscribes peer status change event and updates peer map
 func (s *syncer) startPeerStatusUpdateProcess() {
 	for peerStatus := range s.syncPeerClient.GetPeerStatusUpdateCh() {
-		s.putToPeerMap(peerStatus)
+		if !s.stopping.Load() {
+			s.putToPeerMap(peerStatus)
+		}
 	}
 }
 
@@ -194,15 +201,15 @@ func (s *syncer) Sync(callback func(*types.FullBlock) bool) error {
 			s.logger.Warn("failed to complete bulk sync with peer, try to next one", "peer ID", "error", bestPeer.ID, err)
 		}
 
+		if shouldTerminate {
+			break
+		}
+
 		if lastNumber < bestPeer.Number {
 			skipList[bestPeer.ID] = true
 
 			// continue to next peer
 			continue
-		}
-
-		if shouldTerminate {
-			break
 		}
 	}
 
@@ -255,6 +262,10 @@ func (s *syncer) bulkSyncWithPeer(peerID peer.ID, newBlockCallback func(*types.F
 
 			updateMetrics(fullBlock)
 			shouldTerminate = newBlockCallback(fullBlock)
+
+			if shouldTerminate {
+				return lastReceivedNumber, shouldTerminate, nil
+			}
 
 			lastReceivedNumber = block.Number()
 		case <-time.After(s.blockTimeout):
