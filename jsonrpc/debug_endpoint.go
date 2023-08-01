@@ -129,7 +129,7 @@ func (d *Debug) TraceTransaction(
 	config *TraceConfig,
 ) (interface{}, error) {
 	tx, b, store, err := GetTxAndBlockByTxHash(txHash, d.storeContainer)
-	if err == nil {
+	if err != nil {
 		return nil, err
 	}
 

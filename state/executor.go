@@ -139,14 +139,6 @@ func (e *Executor) ProcessBlock(
 ) (*Transition, error) {
 	txn, err := e.BeginTxn(parentRoot, block.Header, blockCreator)
 
-	//trCfg := structtracer.Config{
-	//	EnableMemory:     true,
-	//	EnableStack:      true,
-	//	EnableStorage:    true,
-	//	EnableReturnData: true,
-	//	Legacy:           true,
-	//}
-
 	if err != nil {
 		return nil, err
 	}
@@ -156,11 +148,17 @@ func (e *Executor) ProcessBlock(
 			continue
 		}
 
-		// TODO [palm]: remove this!  only in place for debugging EVM
+		//trCfg := structtracer.Config{
+		//	EnableMemory:     true,
+		//	EnableStack:      true,
+		//	EnableStorage:    true,
+		//	EnableReturnData: true,
+		//	Legacy:           true,
+		//}
+		//
+		//// TODO [palm]: remove this!  only in place for debugging EVM
 		//tr := structtracer.NewStructTracer(trCfg)
 		//txn.SetTracer(tr)
-
-		txn.accessList = runtime.NewAccessList()
 
 		if err = txn.Write(t); err != nil {
 			return nil, err
@@ -170,7 +168,7 @@ func (e *Executor) ProcessBlock(
 
 		// now get the output from the tracer
 		//outputCsv := tr.GetLogsCsv()
-		//e.logger.Trace("Transaction trace", "output", outputCsv)
+		//e.logger.Debug("Transaction trace", "block", block.Number(), "idx", idx, "output", outputCsv)
 	}
 
 	// Palm - now add in the block reward for the creator
@@ -392,6 +390,9 @@ func (t *Transition) Write(txn *types.Transaction) error {
 			return NewTransitionApplicationError(err, false)
 		}
 	}
+
+	// every tx execution should have its own access list
+	t.accessList = runtime.NewAccessList()
 
 	// Make a local copy and apply the transaction
 	msg := txn.Copy()

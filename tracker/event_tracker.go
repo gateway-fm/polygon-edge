@@ -89,7 +89,6 @@ func (e *EventTracker) Start(ctx context.Context) error {
 		}
 		elapsed := time.Now().UTC().Sub(start)
 
-		// TODO [Palm] - this should be turned back on but needs to handle us not being at genesis
 		// Start
 		if err := blockTracker.Start(); err != nil {
 			if common.IsContextDone(err) {

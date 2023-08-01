@@ -99,7 +99,7 @@ func newStakeManager(
 
 // PostEpoch saves the initial validator set to db
 func (s *stakeManager) PostEpoch(req *PostEpochRequest) error {
-	if req.NewEpochID != 1 {
+	if req.NewEpochID != 1 && req.FirstBlockOfEpoch != s.forkBlock {
 		return nil
 	}
 

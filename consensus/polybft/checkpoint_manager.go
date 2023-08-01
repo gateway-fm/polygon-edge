@@ -342,8 +342,6 @@ func (c *checkpointManager) PostBlock(req *PostBlockRequest) error {
 		"blockNumber", req.FullBlock.Block.Header.Number,
 		"isEpochEndingBlock", req.IsEpochEndingBlock,
 		"isCheckpoint", isCheckpoint,
-		"address", c.key.Address().Bytes(),
-		"miner", req.FullBlock.Block.Header.Miner,
 		"activeMiner", isActiveMiner)
 
 	if isCheckpoint && isActiveMiner {

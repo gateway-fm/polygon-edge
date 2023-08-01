@@ -32,6 +32,10 @@ func (s *StoreContainer) AddStore(store JSONRPCStore, to *uint64) {
 	s.stores = append(s.stores, ForkedStore{To: to, Store: store})
 }
 
+func (s *StoreContainer) Reset() {
+	s.stores = make([]ForkedStore, 0)
+}
+
 func (s *StoreContainer) byNumber(blockNumber BlockNumber) JSONRPCStore {
 	// first check for the special numbers
 	switch blockNumber {

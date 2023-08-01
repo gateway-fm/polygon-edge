@@ -94,7 +94,7 @@ func GetTxAndBlockByTxHash(txHash types.Hash, container *StoreContainer) (*types
 	}
 
 	// now we can get the actual block by hash using the container
-	store, b, err := container.byHash(blockHash, false)
+	store, b, err := container.byHash(blockHash, true)
 	if err != nil {
 		return nil, nil, nil, err
 	}

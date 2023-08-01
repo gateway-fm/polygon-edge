@@ -34,17 +34,20 @@ type validatorsSnapshotCache struct {
 	blockchain blockchainBackend
 	lock       sync.Mutex
 	logger     hclog.Logger
+	forkBlock  uint64
 }
 
 // newValidatorsSnapshotCache initializes a new instance of validatorsSnapshotCache
 func newValidatorsSnapshotCache(
 	logger hclog.Logger, state *State, blockchain blockchainBackend,
+	forkBlock uint64,
 ) *validatorsSnapshotCache {
 	return &validatorsSnapshotCache{
 		snapshots:  map[uint64]*validatorSnapshot{},
 		state:      state,
 		blockchain: blockchain,
 		logger:     logger.Named("validators_snapshot"),
+		forkBlock:  forkBlock,
 	}
 }
 
@@ -110,6 +113,15 @@ func (v *validatorsSnapshotCache) GetSnapshot(
 			return nil, fmt.Errorf("failed to store validators snapshot for epoch 0: %w", err)
 		}
 
+		// now handle fork concerns related to the magic block being the first block of epoch 2, not epoch 1
+		if forkBlock == blockNumber {
+			genesisBlockSnapshot.Epoch = 2
+			err = v.storeSnapshot(genesisBlockSnapshot)
+			if err != nil {
+				return nil, fmt.Errorf("failed to handle forked magic block snapshot: %w", err)
+			}
+		}
+
 		latestValidatorSnapshot = genesisBlockSnapshot
 
 		v.logger.Trace("Built validators snapshot for genesis block")
@@ -158,17 +170,17 @@ func (v *validatorsSnapshotCache) GetSnapshot(
 // computeSnapshot gets desired block header by block number, extracts its extra and applies given delta to the snapshot
 func (v *validatorsSnapshotCache) computeSnapshot(
 	existingSnapshot *validatorSnapshot,
-	nextEpochEndBlockNumber uint64,
+	blockNumber uint64,
 	parents []*types.Header,
 ) (*validatorSnapshot, error) {
 	var header *types.Header
 
-	v.logger.Trace("Compute snapshot started...", "BlockNumber", nextEpochEndBlockNumber)
+	v.logger.Trace("Compute snapshot started...", "BlockNumber", blockNumber)
 
 	if len(parents) > 0 {
 		for i := len(parents) - 1; i >= 0; i-- {
 			parentHeader := parents[i]
-			if parentHeader.Number == nextEpochEndBlockNumber {
+			if parentHeader.Number == blockNumber {
 				v.logger.Trace("Compute snapshot. Found header in parents", "Header", parentHeader.Number)
 				header = parentHeader
 
@@ -180,9 +192,9 @@ func (v *validatorsSnapshotCache) computeSnapshot(
 	if header == nil {
 		var ok bool
 
-		header, ok = v.blockchain.GetHeaderByNumber(nextEpochEndBlockNumber)
+		header, ok = v.blockchain.GetHeaderByNumber(blockNumber)
 		if !ok {
-			return nil, fmt.Errorf("unknown block. Block number=%v", nextEpochEndBlockNumber)
+			return nil, fmt.Errorf("unknown block. Block number=%v", blockNumber)
 		}
 	}
 
@@ -210,13 +222,13 @@ func (v *validatorsSnapshotCache) computeSnapshot(
 	}
 
 	v.logger.Debug("Computed snapshot",
-		"blockNumber", nextEpochEndBlockNumber,
+		"blockNumber", blockNumber,
 		"snapshot", snapshot.String(),
 		"delta", extra.Validators)
 
 	return &validatorSnapshot{
 		Epoch:            snapshotEpoch,
-		EpochEndingBlock: nextEpochEndBlockNumber,
+		EpochEndingBlock: blockNumber,
 		Snapshot:         snapshot,
 	}, nil
 }

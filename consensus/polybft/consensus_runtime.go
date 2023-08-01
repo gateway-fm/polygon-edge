@@ -604,8 +604,8 @@ func (c *consensusRuntime) calculateCommitEpochInput(
 	commitEpoch := &contractsapi.CommitEpochValidatorSetFn{
 		ID: new(big.Int).SetUint64(epochID),
 		Epoch: &contractsapi.Epoch{
-			StartBlock: new(big.Int).SetUint64(epoch.FirstBlockInEpoch - c.config.forkBlock),
-			EndBlock:   new(big.Int).SetUint64(currentBlock.Number + 1 - c.config.forkBlock),
+			StartBlock: new(big.Int).SetUint64(epoch.FirstBlockInEpoch),
+			EndBlock:   new(big.Int).SetUint64(currentBlock.Number + 1),
 			EpochRoot:  types.Hash{},
 		},
 	}
@@ -954,8 +954,14 @@ func (c *consensusRuntime) getFirstBlockOfEpoch(epochNumber uint64, latestHeader
 		return 1, nil
 	}
 
+	// handling an exact fork point
 	if c.config.forkBlock == latestHeader.Number {
-		return latestHeader.Number + 1, nil
+		return latestHeader.Number, nil
+	}
+
+	// restarting from an already forked chain
+	if c.config.forkBlock > 0 && epochNumber == 1 {
+		return c.config.forkBlock, nil
 	}
 
 	blockHeader := latestHeader

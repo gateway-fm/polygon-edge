@@ -452,7 +452,7 @@ func (p *Polybft) Initialize() error {
 	}
 
 	p.state = stt
-	p.validatorsCache = newValidatorsSnapshotCache(p.config.Logger, stt, p.blockchain)
+	p.validatorsCache = newValidatorsSnapshotCache(p.config.Logger, stt, p.blockchain, p.config.Config.Params.ForkBlock)
 
 	// create runtime
 	if err := p.initRuntime(); err != nil {

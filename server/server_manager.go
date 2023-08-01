@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"math/big"
 	"net/http"
 	"path/filepath"
 
@@ -14,7 +15,9 @@ import (
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
+	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/jsonrpc"
 	"github.com/0xPolygon/polygon-edge/secrets"
@@ -192,6 +195,8 @@ func (m *Manager) loadNextFork() error {
 	}
 	m.logger.Info("current head", "head", head)
 
+	m.storeContainer.Reset()
+
 	forks := m.Config.Chain.Params.EngineForks
 
 	forkNumber := -1
@@ -328,15 +333,55 @@ func (m *Manager) insertPolybftForkBlock(
 	if err != nil {
 		return err
 	}
-	b := blockchain.Header()
-	b.Hash = currentHeader.Hash
+	h := blockchain.Header()
+	h.Hash = currentHeader.Hash
 
-	if fork.To != nil && b.Number > *fork.To {
+	if fork.To != nil && h.Number > *fork.To {
 		// we must have already inserted this block so return
 		return nil
 	}
 
 	newStateRoot, err := executor.WriteGenesis(fork.Alloc, currentHeader.StateRoot, true)
+	if err != nil {
+		return err
+	}
+
+	// now we have our genesis contracts in place we need to end the first epoch at the fork block
+	epochCommit := &contractsapi.CommitEpochValidatorSetFn{
+		ID: new(big.Int).SetUint64(1),
+		Epoch: &contractsapi.Epoch{
+			StartBlock: new(big.Int).SetUint64(1),
+			EndBlock:   new(big.Int).SetUint64(h.Number),
+			EpochRoot:  types.Hash{},
+		},
+	}
+
+	input, err := epochCommit.EncodeAbi()
+	if err != nil {
+		return err
+	}
+
+	tx := &types.Transaction{
+		From:     contracts.SystemCaller,
+		To:       &contracts.ValidatorSetContract,
+		Type:     types.StateTx,
+		Input:    input,
+		Gas:      types.StateTransactionGasLimit,
+		GasPrice: big.NewInt(0),
+	}
+	tx.ComputeHash(h.Number)
+
+	transition, err := executor.BeginTxn(newStateRoot, h, types.ZeroAddress)
+	if err != nil {
+		return err
+	}
+
+	err = transition.Write(tx)
+	if err != nil {
+		return err
+	}
+
+	_, newStateRoot, err = transition.Commit()
 	if err != nil {
 		return err
 	}
@@ -372,7 +417,7 @@ func (m *Manager) insertPolybftForkBlock(
 		Committed: &polybft.Signature{},
 		Checkpoint: &polybft.CheckpointData{
 			BlockRound:            1,
-			EpochNumber:           1,
+			EpochNumber:           2,
 			CurrentValidatorsHash: types.Hash{},
 			NextValidatorsHash:    types.Hash{},
 			EventRoot:             types.Hash{},
