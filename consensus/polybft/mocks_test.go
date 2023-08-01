@@ -3,16 +3,17 @@ package polybft
 import (
 	"time"
 
+	"github.com/hashicorp/go-hclog"
+	"github.com/stretchr/testify/mock"
+	"github.com/umbracle/ethgo"
+	"github.com/umbracle/ethgo/contract"
+
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/syncer"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/hashicorp/go-hclog"
-	"github.com/stretchr/testify/mock"
-	"github.com/umbracle/ethgo"
-	"github.com/umbracle/ethgo/contract"
 )
 
 var _ blockchainBackend = (*blockchainMock)(nil)
@@ -129,6 +130,10 @@ var _ polybftBackend = (*polybftBackendMock)(nil)
 
 type polybftBackendMock struct {
 	mock.Mock
+}
+
+func (p *polybftBackendMock) GetRuntimeForkBlock() uint64 {
+	return 0
 }
 
 // GetValidators retrieves validator set for the given block

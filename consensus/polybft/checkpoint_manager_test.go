@@ -10,14 +10,15 @@ import (
 	"github.com/umbracle/ethgo/abi"
 	"github.com/umbracle/ethgo/jsonrpc"
 
+	"github.com/hashicorp/go-hclog"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	"github.com/umbracle/ethgo"
+
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/merkle-tree"
-	hclog "github.com/hashicorp/go-hclog"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-	"github.com/umbracle/ethgo"
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
@@ -281,7 +282,7 @@ func TestCheckpointManager_IsCheckpointBlock(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 
-			checkpointMgr := newCheckpointManager(wallet.NewEcdsaSigner(createTestKey(t)), c.checkpointsOffset, types.ZeroAddress, nil, nil, nil, hclog.NewNullLogger(), nil)
+			checkpointMgr := newCheckpointManager(wallet.NewEcdsaSigner(createTestKey(t)), c.checkpointsOffset, types.ZeroAddress, nil, nil, nil, hclog.NewNullLogger(), nil, 0)
 			require.Equal(t, c.isCheckpointBlock, checkpointMgr.isCheckpointBlock(c.blockNumber, c.isEpochEndingBlock))
 		})
 	}
@@ -321,7 +322,7 @@ func TestCheckpointManager_PostBlock(t *testing.T) {
 
 	blockchain := new(blockchainMock)
 	checkpointManager := newCheckpointManager(wallet.NewEcdsaSigner(createTestKey(t)), 5, types.ZeroAddress,
-		nil, blockchain, nil, hclog.NewNullLogger(), state)
+		nil, blockchain, nil, hclog.NewNullLogger(), state, 0)
 
 	t.Run("PostBlock - not epoch ending block", func(t *testing.T) {
 		require.NoError(t, state.CheckpointStore.updateLastSaved(block-1)) // we got everything till the current block
@@ -481,7 +482,8 @@ func TestCheckpointManager_GenerateExitProof(t *testing.T) {
 		nil,
 		nil,
 		hclog.NewNullLogger(),
-		state)
+		state,
+		0)
 
 	exitEvents := insertTestExitEvents(t, state, 1, numOfBlocks, numOfEventsPerBlock)
 	encodedEvents := encodeExitEvents(t, exitEvents)

@@ -5,6 +5,12 @@ import (
 	"sync"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
+	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/consensus"
+	"github.com/0xPolygon/polygon-edge/gasprice"
+	"github.com/0xPolygon/polygon-edge/helper/progress"
+	"github.com/0xPolygon/polygon-edge/state/runtime"
+	"github.com/0xPolygon/polygon-edge/state/runtime/tracer"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -42,8 +48,6 @@ type mockEvent struct {
 }
 
 type mockStore struct {
-	JSONRPCStore
-
 	header       *types.Header
 	subscription *blockchain.MockSubscription
 	receiptsLock sync.Mutex
@@ -54,9 +58,98 @@ type mockStore struct {
 	historicalHeaders []*types.Header
 }
 
+func (m *mockStore) AddTx(tx *types.Transaction) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockStore) GetPendingTx(txHash types.Hash) (*types.Transaction, bool) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockStore) GetNonce(addr types.Address) uint64 {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockStore) GetStorage(root types.Hash, addr types.Address, slot types.Hash) ([]byte, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockStore) GetForksInTime(blockNumber uint64) chain.ForksInTime {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockStore) GetCode(root types.Hash, addr types.Address) ([]byte, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockStore) ReadTxLookup(txnHash types.Hash) (types.Hash, bool) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockStore) GetAvgGasPrice() *big.Int {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockStore) ApplyTxn(header *types.Header, txn *types.Transaction, override types.StateOverride) (*runtime.ExecutionResult, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockStore) GetSyncProgression() *progress.Progression {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockStore) GetTotalDifficulty(hash types.Hash) (*big.Int, bool) {
+	//TODO implement me
+	return new(big.Int).SetUint64(1), true
+}
+
+func (m *mockStore) MaxPriorityFeePerGas() (*big.Int, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockStore) FeeHistory(u uint64, u2 uint64, float64s []float64) (*gasprice.FeeHistoryReturn, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockStore) GetBaseFee() uint64 {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockStore) TraceBlock(t *types.Block, tracer tracer.Tracer) ([]interface{}, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockStore) TraceTxn(t *types.Block, hash types.Hash, tracer tracer.Tracer) (interface{}, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockStore) TraceCall(t *types.Transaction, header *types.Header, tracer tracer.Tracer) (interface{}, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockStore) BridgeDataProvider() consensus.BridgeDataProvider {
+	return m
+}
+
 func newMockStore() *mockStore {
 	m := &mockStore{
-		header:       &types.Header{Number: 0},
+		header:       &types.Header{Number: 0, Difficulty: 1, Hash: types.ZeroHash},
 		subscription: blockchain.NewMockSubscription(),
 		accounts:     map[types.Address]*Account{},
 	}

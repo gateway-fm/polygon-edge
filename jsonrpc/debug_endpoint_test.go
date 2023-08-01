@@ -6,10 +6,17 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
+
+	"github.com/0xPolygon/polygon-edge/blockchain"
+	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/consensus"
+	"github.com/0xPolygon/polygon-edge/gasprice"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
+	"github.com/0xPolygon/polygon-edge/helper/progress"
+	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/state/runtime/tracer"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/stretchr/testify/assert"
 )
 
 type debugEndpointMockStore struct {
@@ -23,6 +30,101 @@ type debugEndpointMockStore struct {
 	traceCallFn         func(*types.Transaction, *types.Header, tracer.Tracer) (interface{}, error)
 	getNonceFn          func(types.Address) uint64
 	getAccountFn        func(types.Hash, types.Address) (*Account, error)
+}
+
+func (s *debugEndpointMockStore) AddTx(tx *types.Transaction) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (s *debugEndpointMockStore) GetPendingTx(txHash types.Hash) (*types.Transaction, bool) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (s *debugEndpointMockStore) GetStorage(root types.Hash, addr types.Address, slot types.Hash) ([]byte, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (s *debugEndpointMockStore) GetForksInTime(blockNumber uint64) chain.ForksInTime {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (s *debugEndpointMockStore) GetCode(root types.Hash, addr types.Address) ([]byte, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (s *debugEndpointMockStore) GetReceiptsByHash(hash types.Hash) ([]*types.Receipt, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (s *debugEndpointMockStore) GetAvgGasPrice() *big.Int {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (s *debugEndpointMockStore) ApplyTxn(header *types.Header, txn *types.Transaction, override types.StateOverride) (*runtime.ExecutionResult, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (s *debugEndpointMockStore) GetSyncProgression() *progress.Progression {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (s *debugEndpointMockStore) FilterExtra(extra []byte) ([]byte, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (s *debugEndpointMockStore) GetTotalDifficulty(hash types.Hash) (*big.Int, bool) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (s *debugEndpointMockStore) MaxPriorityFeePerGas() (*big.Int, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (s *debugEndpointMockStore) FeeHistory(u uint64, u2 uint64, float64s []float64) (*gasprice.FeeHistoryReturn, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (s *debugEndpointMockStore) GetPeers() int {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (s *debugEndpointMockStore) GetTxs(inclQueued bool) (map[types.Address][]*types.Transaction, map[types.Address][]*types.Transaction) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (s *debugEndpointMockStore) GetCapacity() (uint64, uint64) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (s *debugEndpointMockStore) GetBaseFee() uint64 {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (s *debugEndpointMockStore) SubscribeEvents() blockchain.Subscription {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (s *debugEndpointMockStore) BridgeDataProvider() consensus.BridgeDataProvider {
+	//TODO implement me
+	panic("implement me")
 }
 
 func (s *debugEndpointMockStore) Header() *types.Header {
@@ -269,7 +371,9 @@ func TestTraceBlockByNumber(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			endpoint := &Debug{test.store}
+			c := NewStoreContainer(nil)
+			c.AddStore(test.store, nil)
+			endpoint := &Debug{c}
 
 			res, err := endpoint.TraceBlockByNumber(test.blockNumber, test.config)
 
@@ -338,7 +442,9 @@ func TestTraceBlockByHash(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			endpoint := &Debug{test.store}
+			c := NewStoreContainer(nil)
+			c.AddStore(test.store, nil)
+			endpoint := &Debug{c}
 
 			res, err := endpoint.TraceBlockByHash(test.blockHash, test.config)
 
@@ -397,7 +503,9 @@ func TestTraceBlock(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			endpoint := &Debug{test.store}
+			c := NewStoreContainer(nil)
+			c.AddStore(test.store, nil)
+			endpoint := &Debug{c}
 
 			res, err := endpoint.TraceBlock(test.input, test.config)
 
@@ -543,7 +651,9 @@ func TestTraceTransaction(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			endpoint := &Debug{test.store}
+			c := NewStoreContainer(nil)
+			c.AddStore(test.store, nil)
+			endpoint := &Debug{c}
 
 			res, err := endpoint.TraceTransaction(test.txHash, test.config)
 
@@ -679,7 +789,9 @@ func TestTraceCall(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			endpoint := &Debug{test.store}
+			c := NewStoreContainer(nil)
+			c.AddStore(test.store, nil)
+			endpoint := &Debug{c}
 
 			res, err := endpoint.TraceCall(test.arg, test.filter, test.config)
 

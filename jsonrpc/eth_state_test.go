@@ -5,12 +5,16 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
+	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
+	"github.com/0xPolygon/polygon-edge/state/runtime/tracer"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -766,11 +770,56 @@ func TestEth_EstimateGas_Errors(t *testing.T) {
 }
 
 type mockSpecialStore struct {
-	ethStore
+	EthStore
 	account *mockAccount
 	block   *types.Block
 
 	applyTxnHook func(header *types.Header, txn *types.Transaction) (*runtime.ExecutionResult, error)
+}
+
+func (m *mockSpecialStore) GetPeers() int {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockSpecialStore) GetTxs(inclQueued bool) (map[types.Address][]*types.Transaction, map[types.Address][]*types.Transaction) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockSpecialStore) GetCapacity() (uint64, uint64) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockSpecialStore) GetBaseFee() uint64 {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockSpecialStore) SubscribeEvents() blockchain.Subscription {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockSpecialStore) TraceBlock(t *types.Block, tracer tracer.Tracer) ([]interface{}, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockSpecialStore) TraceTxn(t *types.Block, hash types.Hash, tracer tracer.Tracer) (interface{}, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockSpecialStore) TraceCall(t *types.Transaction, header *types.Header, tracer tracer.Tracer) (interface{}, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockSpecialStore) BridgeDataProvider() consensus.BridgeDataProvider {
+	//TODO implement me
+	panic("implement me")
 }
 
 func (m *mockSpecialStore) GetBlockByHash(hash types.Hash, full bool) (*types.Block, bool) {

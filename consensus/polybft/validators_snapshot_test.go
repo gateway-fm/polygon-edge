@@ -4,12 +4,13 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
-	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 func TestValidatorsSnapshotCache_GetSnapshot_Build(t *testing.T) {
@@ -62,11 +63,11 @@ func TestValidatorsSnapshotCache_GetSnapshot_Build(t *testing.T) {
 	blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(headersMap.getHeader)
 
 	testValidatorsCache := &testValidatorsCache{
-		validatorsSnapshotCache: newValidatorsSnapshotCache(hclog.NewNullLogger(), newTestState(t), blockchainMock),
+		validatorsSnapshotCache: newValidatorsSnapshotCache(hclog.NewNullLogger(), newTestState(t), blockchainMock, 0),
 	}
 
 	for _, c := range cases {
-		snapshot, err := testValidatorsCache.GetSnapshot(c.blockNumber, c.parents)
+		snapshot, err := testValidatorsCache.GetSnapshot(c.blockNumber, c.parents, 0)
 
 		assertions.NoError(err)
 		assertions.Len(snapshot, c.expectedSnapshot.Len())
@@ -112,14 +113,14 @@ func TestValidatorsSnapshotCache_GetSnapshot_FetchFromCache(t *testing.T) {
 	blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(headersMap.getHeader)
 
 	testValidatorsCache := &testValidatorsCache{
-		validatorsSnapshotCache: newValidatorsSnapshotCache(hclog.NewNullLogger(), newTestState(t), blockchainMock),
+		validatorsSnapshotCache: newValidatorsSnapshotCache(hclog.NewNullLogger(), newTestState(t), blockchainMock, 0),
 	}
 
 	require.NoError(testValidatorsCache.storeSnapshot(&validatorSnapshot{1, 10, epochOneValidators}))
 	require.NoError(testValidatorsCache.storeSnapshot(&validatorSnapshot{2, 20, epochTwoValidators}))
 
 	// Fetch snapshot from in memory cache
-	snapshot, err := testValidatorsCache.GetSnapshot(10, nil)
+	snapshot, err := testValidatorsCache.GetSnapshot(10, nil, 0)
 	require.NoError(err)
 	require.Equal(epochOneValidators, snapshot)
 
@@ -127,11 +128,11 @@ func TestValidatorsSnapshotCache_GetSnapshot_FetchFromCache(t *testing.T) {
 	testValidatorsCache.snapshots = map[uint64]*validatorSnapshot{}
 	require.NoError(testValidatorsCache.state.EpochStore.removeAllValidatorSnapshots())
 	// Fetch snapshot from database
-	snapshot, err = testValidatorsCache.GetSnapshot(10, nil)
+	snapshot, err = testValidatorsCache.GetSnapshot(10, nil, 0)
 	require.NoError(err)
 	require.Equal(epochOneValidators, snapshot)
 
-	snapshot, err = testValidatorsCache.GetSnapshot(20, nil)
+	snapshot, err = testValidatorsCache.GetSnapshot(20, nil, 0)
 	require.NoError(err)
 	require.Equal(epochTwoValidators, snapshot)
 }
@@ -142,7 +143,7 @@ func TestValidatorsSnapshotCache_Cleanup(t *testing.T) {
 
 	blockchainMock := new(blockchainMock)
 	cache := &testValidatorsCache{
-		validatorsSnapshotCache: newValidatorsSnapshotCache(hclog.NewNullLogger(), newTestState(t), blockchainMock),
+		validatorsSnapshotCache: newValidatorsSnapshotCache(hclog.NewNullLogger(), newTestState(t), blockchainMock, 0),
 	}
 	snapshot := validator.NewTestValidators(t, 3).GetPublicIdentities()
 	maxEpoch := uint64(0)
@@ -201,7 +202,7 @@ func TestValidatorsSnapshotCache_ComputeSnapshot_UnknownBlock(t *testing.T) {
 	blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(headersMap.getHeader)
 
 	testValidatorsCache := &testValidatorsCache{
-		validatorsSnapshotCache: newValidatorsSnapshotCache(hclog.NewNullLogger(), newTestState(t), blockchainMock),
+		validatorsSnapshotCache: newValidatorsSnapshotCache(hclog.NewNullLogger(), newTestState(t), blockchainMock, 0),
 	}
 
 	snapshot, err := testValidatorsCache.computeSnapshot(nil, 5*epochSize, nil)
@@ -229,7 +230,7 @@ func TestValidatorsSnapshotCache_ComputeSnapshot_IncorrectExtra(t *testing.T) {
 	blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(headersMap.getHeader)
 
 	testValidatorsCache := &testValidatorsCache{
-		validatorsSnapshotCache: newValidatorsSnapshotCache(hclog.NewNullLogger(), newTestState(t), blockchainMock),
+		validatorsSnapshotCache: newValidatorsSnapshotCache(hclog.NewNullLogger(), newTestState(t), blockchainMock, 0),
 	}
 
 	snapshot, err := testValidatorsCache.computeSnapshot(nil, 1*epochSize, nil)
@@ -256,7 +257,7 @@ func TestValidatorsSnapshotCache_ComputeSnapshot_ApplyDeltaFail(t *testing.T) {
 	blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(headersMap.getHeader)
 
 	testValidatorsCache := &testValidatorsCache{
-		validatorsSnapshotCache: newValidatorsSnapshotCache(hclog.NewNullLogger(), newTestState(t), blockchainMock),
+		validatorsSnapshotCache: newValidatorsSnapshotCache(hclog.NewNullLogger(), newTestState(t), blockchainMock, 0),
 	}
 
 	snapshot, err := testValidatorsCache.computeSnapshot(&validatorSnapshot{0, 0, allValidators}, 1*epochSize, nil)

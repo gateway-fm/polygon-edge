@@ -3,9 +3,10 @@ package snapshot
 import (
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
-	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -30,25 +31,25 @@ func Test_isAuthorize(t *testing.T) {
 	tests := []struct {
 		name         string
 		nonce        types.Nonce
-		expectedFlag bool
+		expectedFlag AuthorizeResult
 		expectedErr  error
 	}{
 		{
 			name:         "nonceAuthVote",
 			nonce:        nonceAuthVote,
-			expectedFlag: true,
+			expectedFlag: YesAuthorize,
 			expectedErr:  nil,
 		},
 		{
 			name:         "nonceDropVote",
 			nonce:        nonceDropVote,
-			expectedFlag: false,
+			expectedFlag: NoAuthorize,
 			expectedErr:  nil,
 		},
 		{
 			name:         "invalid nonce",
 			nonce:        types.Nonce{0x1},
-			expectedFlag: false,
+			expectedFlag: InconclusiveAuthorize,
 			expectedErr:  ErrIncorrectNonce,
 		},
 	}
@@ -58,9 +59,12 @@ func Test_isAuthorize(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			res, err := isAuthorize(test.nonce)
+			h := &types.Header{
+				Nonce: test.nonce,
+			}
+			auth, _, err := isAuthorize(h, validators.ECDSAValidatorType, false)
 
-			assert.Equal(t, test.expectedFlag, res)
+			assert.Equal(t, test.expectedFlag, auth)
 			assert.ErrorIs(t, test.expectedErr, err)
 		})
 	}

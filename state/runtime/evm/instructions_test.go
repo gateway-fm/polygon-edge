@@ -4,11 +4,12 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -424,6 +425,7 @@ func TestCreate(t *testing.T) {
 			s.memory = tt.initState.memory
 			s.config = tt.config
 			s.host = tt.mockHost
+			s.accessList = runtime.NewAccessList()
 
 			opCreate(tt.op)(s)
 
@@ -719,6 +721,7 @@ func Test_opCall(t *testing.T) {
 			state.memory = test.initState.memory
 			state.config = test.config
 			state.host = test.mockHost
+			state.accessList = runtime.NewAccessList()
 
 			opCall(test.op)(state)
 

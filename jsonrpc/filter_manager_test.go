@@ -11,12 +11,13 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/blockchain"
-	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/gorilla/websocket"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/0xPolygon/polygon-edge/blockchain"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 func Test_GetLogsForQuery(t *testing.T) {
@@ -128,7 +129,9 @@ func Test_GetLogsForQuery(t *testing.T) {
 
 	store.appendBlocksToStore(blocks)
 
-	f := NewFilterManager(hclog.NewNullLogger(), store, 1000)
+	c := NewStoreContainer(nil)
+	c.AddStore(store, nil)
+	f := NewFilterManager(hclog.NewNullLogger(), c, 1000)
 
 	t.Cleanup(func() {
 		defer f.Close()
@@ -212,7 +215,9 @@ func Test_getLogsFromBlock(t *testing.T) {
 
 	store.appendBlocksToStore([]*types.Block{block})
 
-	f := NewFilterManager(hclog.NewNullLogger(), store, 1000)
+	c := NewStoreContainer(nil)
+	c.AddStore(store, nil)
+	f := NewFilterManager(hclog.NewNullLogger(), c, 1000)
 
 	t.Cleanup(func() {
 		defer f.Close()
@@ -236,7 +241,9 @@ func Test_GetLogFilterFromID(t *testing.T) {
 
 	store := newMockStore()
 
-	m := NewFilterManager(hclog.NewNullLogger(), store, 1000)
+	c := NewStoreContainer(nil)
+	c.AddStore(store, nil)
+	m := NewFilterManager(hclog.NewNullLogger(), c, 1000)
 	defer m.Close()
 
 	go m.Run()
@@ -259,7 +266,9 @@ func TestFilterLog(t *testing.T) {
 
 	store := newMockStore()
 
-	m := NewFilterManager(hclog.NewNullLogger(), store, 1000)
+	c := NewStoreContainer(nil)
+	c.AddStore(store, nil)
+	m := NewFilterManager(hclog.NewNullLogger(), c, 1000)
 	defer m.Close()
 
 	go m.Run()
@@ -323,7 +332,9 @@ func TestFilterBlock(t *testing.T) {
 
 	store := newMockStore()
 
-	m := NewFilterManager(hclog.NewNullLogger(), store, 1000)
+	c := NewStoreContainer(nil)
+	c.AddStore(store, nil)
+	m := NewFilterManager(hclog.NewNullLogger(), c, 1000)
 	defer m.Close()
 
 	go m.Run()
@@ -388,7 +399,9 @@ func TestFilterTimeout(t *testing.T) {
 
 	store := newMockStore()
 
-	m := NewFilterManager(hclog.NewNullLogger(), store, 1000)
+	c := NewStoreContainer(nil)
+	c.AddStore(store, nil)
+	m := NewFilterManager(hclog.NewNullLogger(), c, 1000)
 	defer m.Close()
 
 	m.timeout = 2 * time.Second
@@ -410,7 +423,9 @@ func TestRemoveFilterByWebsocket(t *testing.T) {
 
 	mock, _ := newMockWsConnWithMsgCh()
 
-	m := NewFilterManager(hclog.NewNullLogger(), store, 1000)
+	c := NewStoreContainer(nil)
+	c.AddStore(store, nil)
+	m := NewFilterManager(hclog.NewNullLogger(), c, 1000)
 	defer m.Close()
 
 	go m.Run()
@@ -428,7 +443,9 @@ func Test_flushWsFilters(t *testing.T) {
 
 	store := newMockStore()
 
-	m := NewFilterManager(hclog.NewNullLogger(), store, 1000)
+	c := NewStoreContainer(nil)
+	c.AddStore(store, nil)
+	m := NewFilterManager(hclog.NewNullLogger(), c, 1000)
 
 	t.Cleanup(func() {
 		m.Close()
@@ -517,7 +534,9 @@ func TestFilterWebsocket(t *testing.T) {
 
 	mock, msgCh := newMockWsConnWithMsgCh()
 
-	m := NewFilterManager(hclog.NewNullLogger(), store, 1000)
+	c := NewStoreContainer(nil)
+	c.AddStore(store, nil)
+	m := NewFilterManager(hclog.NewNullLogger(), c, 1000)
 	defer m.Close()
 
 	go m.Run()
@@ -690,7 +709,9 @@ func TestClosedFilterDeletion(t *testing.T) {
 
 	store := newMockStore()
 
-	m := NewFilterManager(hclog.NewNullLogger(), store, 1000)
+	c := NewStoreContainer(nil)
+	c.AddStore(store, nil)
+	m := NewFilterManager(hclog.NewNullLogger(), c, 1000)
 	defer m.Close()
 
 	go m.Run()

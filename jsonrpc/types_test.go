@@ -12,9 +12,10 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 
-	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 func TestBasicTypes_Encode(t *testing.T) {
@@ -204,7 +205,7 @@ func TestBlock_Encoding(t *testing.T) {
 
 		data, err := testsuite.ReadFile(name)
 		require.NoError(t, err)
-		require.JSONEq(t, string(data), string(res))
+		require.JSONEq(t, string(res), string(data))
 	}
 
 	t.Run("empty block", func(t *testing.T) {

@@ -2488,6 +2488,7 @@ func TestSnapshotValidatorStore_processVote(t *testing.T) {
 			header: &types.Header{
 				Nonce: types.Nonce{0x01},
 			},
+			candidateType:    validators.ECDSAValidatorType,
 			proposer:         types.ZeroAddress,
 			snapshot:         nil,
 			expectedErr:      ErrIncorrectNonce,
@@ -2790,7 +2791,7 @@ func Test_minerToValidator(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			res, err := minerToValidator(test.validatorType, test.miner, false)
+			res, err := minerToValidator(test.validatorType, test.miner)
 
 			assert.Equal(
 				t,

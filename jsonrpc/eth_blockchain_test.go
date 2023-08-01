@@ -5,12 +5,17 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/0xPolygon/polygon-edge/blockchain"
+	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/consensus"
+	"github.com/0xPolygon/polygon-edge/gasprice"
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
+	"github.com/0xPolygon/polygon-edge/state/runtime/tracer"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/stretchr/testify/assert"
 )
 
 func TestEth_Block_GetBlockByNumber(t *testing.T) {
@@ -62,7 +67,7 @@ func TestEth_Block_GetBlockByHash(t *testing.T) {
 	assert.NotNil(t, res)
 
 	res, err = eth.GetBlockByHash(hash2, false)
-	assert.NoError(t, err)
+	assert.Contains(t, err.Error(), "not found")
 	assert.Nil(t, res)
 }
 
@@ -391,12 +396,7 @@ func TestEth_Call(t *testing.T) {
 	})
 }
 
-type testStore interface {
-	ethStore
-}
-
 type mockBlockStore struct {
-	testStore
 	blocks          []*types.Block
 	topics          []types.Hash
 	pendingTxns     []*types.Transaction
@@ -405,6 +405,96 @@ type mockBlockStore struct {
 	averageGasPrice int64
 	ethCallError    error
 	returnValue     []byte
+}
+
+func (m *mockBlockStore) AddTx(tx *types.Transaction) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockBlockStore) GetNonce(addr types.Address) uint64 {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockBlockStore) GetAccount(root types.Hash, addr types.Address) (*Account, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockBlockStore) GetStorage(root types.Hash, addr types.Address, slot types.Hash) ([]byte, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockBlockStore) GetForksInTime(blockNumber uint64) chain.ForksInTime {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockBlockStore) GetCode(root types.Hash, addr types.Address) ([]byte, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockBlockStore) GetHeaderByNumber(u uint64) (*types.Header, bool) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockBlockStore) GetTotalDifficulty(hash types.Hash) (*big.Int, bool) {
+	//TODO implement me
+	return new(big.Int).SetUint64(1), false
+}
+
+func (m *mockBlockStore) MaxPriorityFeePerGas() (*big.Int, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockBlockStore) FeeHistory(u uint64, u2 uint64, float64s []float64) (*gasprice.FeeHistoryReturn, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockBlockStore) GetPeers() int {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockBlockStore) GetTxs(inclQueued bool) (map[types.Address][]*types.Transaction, map[types.Address][]*types.Transaction) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockBlockStore) GetCapacity() (uint64, uint64) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockBlockStore) GetBaseFee() uint64 {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockBlockStore) TraceBlock(t *types.Block, tracer tracer.Tracer) ([]interface{}, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockBlockStore) TraceTxn(t *types.Block, hash types.Hash, tracer tracer.Tracer) (interface{}, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockBlockStore) TraceCall(t *types.Transaction, header *types.Header, tracer tracer.Tracer) (interface{}, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockBlockStore) BridgeDataProvider() consensus.BridgeDataProvider {
+	//TODO implement me
+	panic("implement me")
 }
 
 func newMockBlockStore() *mockBlockStore {

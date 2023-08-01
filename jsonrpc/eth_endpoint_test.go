@@ -5,9 +5,10 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 func TestEth_DecodeTxn(t *testing.T) {
@@ -168,7 +169,9 @@ func TestEth_DecodeTxn(t *testing.T) {
 				store.SetAccount(addr, acc)
 			}
 
-			res, err := DecodeTxn(tt.arg, 1, store)
+			c := NewStoreContainer(nil)
+			c.AddStore(store, nil)
+			res, err := DecodeTxn(tt.arg, 1, c)
 			assert.Equal(t, tt.res, res)
 			assert.Equal(t, tt.err, err)
 		})
@@ -231,7 +234,7 @@ func TestEth_GetNextNonce(t *testing.T) {
 			t.Parallel()
 
 			// Grab the nonce
-			nonce, err := GetNextNonce(testCase.account, testCase.number, eth.store)
+			nonce, err := GetNextNonce(testCase.account, testCase.number, eth.storeContainer)
 
 			// Assert errors
 			assert.NoError(t, err)
@@ -288,22 +291,28 @@ func TestEth_TxnType(t *testing.T) {
 		Nonce:     0,
 		Type:      types.DynamicFeeTx,
 	}
-	res, err := DecodeTxn(args, 1, store)
+	c := NewStoreContainer(nil)
+	c.AddStore(store, nil)
+	res, err := DecodeTxn(args, 1, c)
 
 	expectedRes.ComputeHash(1)
 	assert.NoError(t, err)
 	assert.Equal(t, expectedRes, res)
 }
 
-func newTestEthEndpoint(store testStore) *Eth {
+func newTestEthEndpoint(store JSONRPCStore) *Eth {
+	c := NewStoreContainer(nil)
+	c.AddStore(store, nil)
 	return &Eth{
-		hclog.NewNullLogger(), store, 100, nil, 0,
+		hclog.NewNullLogger(), c, 100, nil, 0,
 	}
 }
 
-func newTestEthEndpointWithPriceLimit(store testStore, priceLimit uint64) *Eth {
+func newTestEthEndpointWithPriceLimit(store JSONRPCStore, priceLimit uint64) *Eth {
+	c := NewStoreContainer(nil)
+	c.AddStore(store, nil)
 	return &Eth{
-		hclog.NewNullLogger(), store, 100, nil, priceLimit,
+		hclog.NewNullLogger(), c, 100, nil, priceLimit,
 	}
 }
 
@@ -354,7 +363,9 @@ func TestEth_HeaderResolveBlock(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		header, err := GetHeaderFromBlockNumberOrHash(c.filter, store)
+		con := NewStoreContainer(nil)
+		con.AddStore(store, nil)
+		header, _, err := GetHeaderFromBlockNumberOrHash(c.filter, con)
 		if c.err {
 			assert.Error(t, err)
 		} else {

@@ -5,6 +5,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/hashicorp/go-hclog"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	"github.com/umbracle/ethgo"
+
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus"
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
@@ -13,11 +19,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/helper/progress"
 	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/hashicorp/go-hclog"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-	"github.com/umbracle/ethgo"
 )
 
 // the test initializes polybft and chain mock (map of headers) after which a new header is verified
@@ -121,6 +122,7 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 			hclog.NewNullLogger(),
 			newTestState(t),
 			blockchainMock,
+			0,
 		),
 	}
 
@@ -179,13 +181,13 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 	assert.NoError(t, polybft.VerifyHeader(currentHeader))
 
 	// clean validator snapshot cache (re-instantiate it), submit invalid validator set for parent signature and expect the following error
-	polybft.validatorsCache = newValidatorsSnapshotCache(hclog.NewNullLogger(), newTestState(t), blockchainMock)
+	polybft.validatorsCache = newValidatorsSnapshotCache(hclog.NewNullLogger(), newTestState(t), blockchainMock, 0)
 	assert.NoError(t, polybft.validatorsCache.storeSnapshot(&validatorSnapshot{Epoch: 0, Snapshot: validatorSetCurrent})) // invalid validator set is submitted
 	assert.NoError(t, polybft.validatorsCache.storeSnapshot(&validatorSnapshot{Epoch: 1, Snapshot: validatorSetCurrent}))
 	assert.ErrorContains(t, polybft.VerifyHeader(currentHeader), "failed to verify signatures for parent of block")
 
 	// clean validators cache again and set valid snapshots
-	polybft.validatorsCache = newValidatorsSnapshotCache(hclog.NewNullLogger(), newTestState(t), blockchainMock)
+	polybft.validatorsCache = newValidatorsSnapshotCache(hclog.NewNullLogger(), newTestState(t), blockchainMock, 0)
 	assert.NoError(t, polybft.validatorsCache.storeSnapshot(&validatorSnapshot{Epoch: 0, Snapshot: validatorSetParent}))
 	assert.NoError(t, polybft.validatorsCache.storeSnapshot(&validatorSnapshot{Epoch: 1, Snapshot: validatorSetCurrent}))
 	assert.NoError(t, polybft.VerifyHeader(currentHeader))
@@ -258,6 +260,7 @@ func Test_Factory(t *testing.T) {
 			Config: map[string]interface{}{
 				"EpochSize": epochSize,
 			},
+			Params: &chain.Params{},
 		},
 	}
 

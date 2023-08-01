@@ -5,11 +5,6 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/chain"
-	"github.com/0xPolygon/polygon-edge/contracts"
-	"github.com/0xPolygon/polygon-edge/state"
-	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
-	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -17,6 +12,12 @@ import (
 	"github.com/umbracle/ethgo/abi"
 	"github.com/umbracle/ethgo/contract"
 	"github.com/umbracle/ethgo/testutil"
+
+	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/contracts"
+	"github.com/0xPolygon/polygon-edge/state"
+	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 func TestSystemState_GetNextCommittedIndex(t *testing.T) {
@@ -138,7 +139,7 @@ func newTestTransition(t *testing.T, alloc map[types.Address]*chain.GenesisAccou
 		},
 	}, st, hclog.NewNullLogger())
 
-	rootHash, err := ex.WriteGenesis(alloc, types.Hash{})
+	rootHash, err := ex.WriteGenesis(alloc, types.Hash{}, true)
 	require.NoError(t, err)
 
 	ex.GetHash = func(h *types.Header) state.GetHashByNumber {

@@ -27,7 +27,7 @@ func TestSign_Sealer(t *testing.T) {
 
 	signer.UseIstanbulHeaderHashInTest(t, signerA)
 
-	signerA.InitIBFTExtra(h, correctValset, nil)
+	signerA.InitIBFTExtra(h, correctValset, nil, signer.Vote{})
 
 	h = h.ComputeHash()
 
@@ -69,7 +69,7 @@ func TestSign_CommittedSeals(t *testing.T) {
 		false,
 	)
 
-	signerA.InitIBFTExtra(h, correctValSet, nil)
+	signerA.InitIBFTExtra(h, correctValSet, nil, signer.Vote{})
 
 	h.Hash, err = signerA.CalculateHeaderHash(h, signer.EncodeEverything)
 	if err != nil {

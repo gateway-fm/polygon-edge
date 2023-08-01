@@ -7,12 +7,13 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/state/runtime/evm"
 	"github.com/0xPolygon/polygon-edge/state/runtime/tracer"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/stretchr/testify/assert"
 )
 
 var (
@@ -243,12 +244,14 @@ func TestStructTracerCallStart(t *testing.T) {
 		[]byte("input"),
 	)
 
-	// make sure the method updates nothing
-	assert.Equal(
+	// make sure the method updates the call frame
+	assert.NotEqual(
 		t,
 		NewStructTracer(testEmptyConfig),
 		tracer,
 	)
+
+	assert.Equal(t, 1, len(tracer.callStack))
 }
 
 func TestStructTracerCallEnd(t *testing.T) {

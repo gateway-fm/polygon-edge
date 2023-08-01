@@ -8,11 +8,12 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/hashicorp/go-hclog"
+	"github.com/stretchr/testify/require"
+
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/hashicorp/go-hclog"
-	"github.com/stretchr/testify/require"
 )
 
 type epochIDValidatorsF struct {
@@ -158,6 +159,7 @@ func FuzzTestStakeManagerPostBlock(f *testing.F) {
 			types.StringToAddress("0x0002"),
 			nil,
 			5,
+			0,
 		)
 
 		// insert initial full validator set
@@ -205,6 +207,7 @@ func FuzzTestStakeManagerUpdateValidatorSet(f *testing.F) {
 		types.StringToAddress("0x0001"), types.StringToAddress("0x0002"),
 		nil,
 		10,
+		0,
 	)
 
 	seeds := []updateValidatorSetF{

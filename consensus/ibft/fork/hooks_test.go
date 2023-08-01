@@ -4,6 +4,9 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/hashicorp/go-hclog"
+	"github.com/stretchr/testify/assert"
+
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft/hook"
 	"github.com/0xPolygon/polygon-edge/contracts/staking"
@@ -15,8 +18,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/0xPolygon/polygon-edge/validators"
 	"github.com/0xPolygon/polygon-edge/validators/store"
-	"github.com/hashicorp/go-hclog"
-	"github.com/stretchr/testify/assert"
 )
 
 type mockHeaderModifierStore struct {
@@ -284,7 +285,7 @@ func newTestTransition(
 		},
 	}, st, hclog.NewNullLogger())
 
-	rootHash, err := ex.WriteGenesis(nil, types.Hash{})
+	rootHash, err := ex.WriteGenesis(nil, types.Hash{}, true)
 	assert.NoError(t, err)
 
 	ex.GetHash = func(h *types.Header) state.GetHashByNumber {

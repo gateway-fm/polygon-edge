@@ -4,11 +4,12 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/state/runtime/tracer"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/stretchr/testify/assert"
 )
 
 func newMockContract(value *big.Int, gas uint64, code []byte) *runtime.Contract {
@@ -20,6 +21,7 @@ func newMockContract(value *big.Int, gas uint64, code []byte) *runtime.Contract 
 		value,
 		gas,
 		code,
+		runtime.NewAccessList(),
 	)
 }
 

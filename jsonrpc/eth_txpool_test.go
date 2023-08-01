@@ -4,8 +4,12 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/0xPolygon/polygon-edge/blockchain"
+	"github.com/0xPolygon/polygon-edge/consensus"
+	"github.com/0xPolygon/polygon-edge/state/runtime/tracer"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 func TestEth_TxnPool_SendRawTransaction(t *testing.T) {
@@ -47,9 +51,54 @@ func TestEth_TxnPool_SendTransaction(t *testing.T) {
 }
 
 type mockStoreTxn struct {
-	ethStore
+	EthStore
 	accounts map[types.Address]*mockAccount
 	txn      *types.Transaction
+}
+
+func (m *mockStoreTxn) GetPeers() int {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockStoreTxn) GetTxs(inclQueued bool) (map[types.Address][]*types.Transaction, map[types.Address][]*types.Transaction) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockStoreTxn) GetCapacity() (uint64, uint64) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockStoreTxn) GetBaseFee() uint64 {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockStoreTxn) SubscribeEvents() blockchain.Subscription {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockStoreTxn) TraceBlock(t *types.Block, tracer tracer.Tracer) ([]interface{}, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockStoreTxn) TraceTxn(t *types.Block, hash types.Hash, tracer tracer.Tracer) (interface{}, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockStoreTxn) TraceCall(t *types.Transaction, header *types.Header, tracer tracer.Tracer) (interface{}, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *mockStoreTxn) BridgeDataProvider() consensus.BridgeDataProvider {
+	//TODO implement me
+	panic("implement me")
 }
 
 func (m *mockStoreTxn) AddTx(tx *types.Transaction) error {

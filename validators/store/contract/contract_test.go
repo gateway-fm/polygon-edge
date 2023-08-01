@@ -88,7 +88,7 @@ func newTestTransition(
 		},
 	}, st, hclog.NewNullLogger())
 
-	rootHash, err := ex.WriteGenesis(nil, types.Hash{})
+	rootHash, err := ex.WriteGenesis(nil, types.Hash{}, true)
 	assert.NoError(t, err)
 
 	ex.GetHash = func(h *types.Header) state.GetHashByNumber {

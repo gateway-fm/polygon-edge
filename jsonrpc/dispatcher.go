@@ -90,10 +90,10 @@ func newDispatcher(
 func (d *Dispatcher) registerEndpoints(container *StoreContainer) error {
 	d.endpoints.Eth = &Eth{
 		d.logger,
+		container,
 		d.params.chainID,
 		d.filterManager,
 		d.params.priceLimit,
-		container,
 	}
 
 	// some endpoints do not need to handle history and only care about the latest store using the latest consensus

@@ -91,10 +91,10 @@ type EthStore interface {
 // Eth is the eth jsonrpc endpoint
 type Eth struct {
 	logger         hclog.Logger
+	storeContainer *StoreContainer
 	chainID        uint64
 	filterManager  *FilterManager
 	priceLimit     uint64
-	storeContainer *StoreContainer
 }
 
 var (

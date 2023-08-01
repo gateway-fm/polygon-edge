@@ -8,10 +8,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 var (
@@ -538,7 +539,9 @@ func TestDispatcher_WebsocketConnection_Unsubscribe(t *testing.T) {
 func newTestDispatcher(t *testing.T, logger hclog.Logger, store JSONRPCStore, params *dispatcherParams) *Dispatcher {
 	t.Helper()
 
-	d, err := newDispatcher(logger, store, params)
+	c := NewStoreContainer(nil)
+	c.AddStore(store, nil)
+	d, err := newDispatcher(logger, c, params)
 	require.NoError(t, err)
 
 	return d

@@ -4,7 +4,9 @@ import (
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
-var DefaultHashStore = &HashFunctions{}
+var DefaultHashStore = &HashFunctions{
+	Hashers: make([]Hasher, 0),
+}
 
 type HashFunctions struct {
 	Hashers []Hasher

@@ -4,18 +4,19 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
-	"github.com/0xPolygon/polygon-edge/helper/hex"
-	"github.com/0xPolygon/polygon-edge/txrelayer"
-	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/hashicorp/go-hclog"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/abi"
 	"github.com/umbracle/ethgo/jsonrpc"
+
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
+	"github.com/0xPolygon/polygon-edge/txrelayer"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 func TestStakeManager_PostEpoch(t *testing.T) {
@@ -30,8 +31,9 @@ func TestStakeManager_PostEpoch(t *testing.T) {
 
 	t.Run("Not first epoch", func(t *testing.T) {
 		require.NoError(t, stakeManager.PostEpoch(&PostEpochRequest{
-			NewEpochID:   2,
-			ValidatorSet: validator.NewValidatorSet(validators, stakeManager.logger),
+			FirstBlockOfEpoch: 100,
+			NewEpochID:        3,
+			ValidatorSet:      validator.NewValidatorSet(validators, stakeManager.logger),
 		}))
 
 		_, err := state.StakeStore.getFullValidatorSet()
@@ -79,6 +81,7 @@ func TestStakeManager_PostBlock(t *testing.T) {
 			validatorSetAddr, types.StringToAddress("0x0002"),
 			nil,
 			5,
+			0,
 		)
 
 		// insert initial full validator set
@@ -135,6 +138,7 @@ func TestStakeManager_PostBlock(t *testing.T) {
 			types.StringToAddress("0x0001"), types.StringToAddress("0x0002"),
 			nil,
 			5,
+			0,
 		)
 
 		// insert initial full validator set
@@ -201,6 +205,7 @@ func TestStakeManager_PostBlock(t *testing.T) {
 			types.StringToAddress("0x0001"), types.StringToAddress("0x0002"),
 			nil,
 			5,
+			0,
 		)
 
 		// insert initial full validator set
@@ -262,6 +267,7 @@ func TestStakeManager_PostBlock(t *testing.T) {
 			types.StringToAddress("0x0001"), types.StringToAddress("0x0002"),
 			bcMock,
 			5,
+			0,
 		)
 
 		// insert initial full validator set
@@ -325,6 +331,7 @@ func TestStakeManager_UpdateValidatorSet(t *testing.T) {
 		types.StringToAddress("0x0001"), types.StringToAddress("0x0002"),
 		nil,
 		10,
+		0,
 	)
 
 	t.Run("UpdateValidatorSet - only update", func(t *testing.T) {

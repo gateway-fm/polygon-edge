@@ -6,8 +6,9 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 func createTestTransaction(hash types.Hash) *types.Transaction {
@@ -67,7 +68,7 @@ func TestGetNumericBlockNumber(t *testing.T) {
 	tests := []struct {
 		name     string
 		num      BlockNumber
-		store    latestHeaderGetter
+		store    JSONRPCStore
 		expected uint64
 		err      error
 	}{
@@ -161,7 +162,9 @@ func TestGetNumericBlockNumber(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			res, err := GetNumericBlockNumber(test.num, test.store)
+			c := NewStoreContainer(nil)
+			c.AddStore(test.store, nil)
+			res, _, err := GetNumericBlockNumber(test.num, c)
 
 			assert.Equal(t, test.expected, res)
 			assert.Equal(t, test.err, err)
@@ -175,7 +178,7 @@ func TestGetBlockHeader(t *testing.T) {
 	tests := []struct {
 		name     string
 		num      BlockNumber
-		store    headerGetter
+		store    JSONRPCStore
 		expected *types.Header
 		err      error
 	}{
@@ -261,7 +264,9 @@ func TestGetBlockHeader(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			res, err := GetBlockHeader(test.num, test.store)
+			c := NewStoreContainer(nil)
+			c.AddStore(test.store, nil)
+			res, _, err := GetBlockHeader(test.num, c)
 
 			assert.Equal(t, test.expected, res)
 			assert.Equal(t, test.err, err)
@@ -282,7 +287,7 @@ func TestGetTxAndBlockByTxHash(t *testing.T) {
 	tests := []struct {
 		name   string
 		txHash types.Hash
-		store  txLookupAndBlockGetter
+		store  JSONRPCStore
 		tx     *types.Transaction
 		block  *types.Block
 	}{
@@ -364,7 +369,9 @@ func TestGetTxAndBlockByTxHash(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			tx, block := GetTxAndBlockByTxHash(test.txHash, test.store)
+			c := NewStoreContainer(nil)
+			c.AddStore(test.store, nil)
+			tx, block, _, _ := GetTxAndBlockByTxHash(test.txHash, c)
 
 			assert.Equal(t, test.tx, tx)
 			assert.Equal(t, test.block, block)
@@ -472,7 +479,9 @@ func TestGetHeaderFromBlockNumberOrHash(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			header, err := GetHeaderFromBlockNumberOrHash(test.bnh, test.store)
+			c := NewStoreContainer(nil)
+			c.AddStore(test.store, nil)
+			header, _, err := GetHeaderFromBlockNumberOrHash(test.bnh, c)
 
 			assert.Equal(t, test.header, header)
 
@@ -501,7 +510,7 @@ func TestGetNextNonce(t *testing.T) {
 		name     string
 		address  types.Address
 		num      BlockNumber
-		store    nonceGetter
+		store    JSONRPCStore
 		expected uint64
 		err      bool
 	}{
@@ -609,7 +618,9 @@ func TestGetNextNonce(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			nonce, err := GetNextNonce(test.address, test.num, test.store)
+			c := NewStoreContainer(nil)
+			c.AddStore(test.store, nil)
+			nonce, err := GetNextNonce(test.address, test.num, c)
 
 			assert.Equal(t, test.expected, nonce)
 
@@ -644,7 +655,7 @@ func TestDecodeTxn(t *testing.T) {
 	tests := []struct {
 		name     string
 		arg      *txnArgs
-		store    nonceGetter
+		store    JSONRPCStore
 		expected *types.Transaction
 		err      bool
 	}{
@@ -825,7 +836,9 @@ func TestDecodeTxn(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			tx, err := DecodeTxn(test.arg, 1, test.store)
+			c := NewStoreContainer(nil)
+			c.AddStore(test.store, nil)
+			tx, err := DecodeTxn(test.arg, 1, c)
 
 			// DecodeTxn computes hash of tx
 			if !test.err {
