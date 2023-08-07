@@ -288,7 +288,7 @@ var opCodeToString = map[OpCode]string{
 	SAR:            "SAR",
 	ADDMOD:         "ADDMOD",
 	MULMOD:         "MULMOD",
-	SHA3:           "SHA3",
+	SHA3:           "KECCAK256",
 	ADDRESS:        "ADDRESS",
 	BALANCE:        "BALANCE",
 	ORIGIN:         "ORIGIN",

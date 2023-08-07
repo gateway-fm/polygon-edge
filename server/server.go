@@ -155,15 +155,16 @@ func NewManagedServer(
 	storeContainer *jsonrpc.StoreContainer,
 ) (*Server, error) {
 	m := &Server{
-		config:           config,
-		logger:           logger,
-		prometheusServer: prometheusServer,
-		secretsManager:   secretsManager,
-		stateStorage:     stateStorage,
-		state:            st,
-		db:               db,
-		grpcServer:       grpc.NewServer(grpc.UnaryInterceptor(unaryInterceptor)),
-		storeContainer:   storeContainer,
+		config:             config,
+		logger:             logger,
+		prometheusServer:   prometheusServer,
+		secretsManager:     secretsManager,
+		stateStorage:       stateStorage,
+		state:              st,
+		db:                 db,
+		grpcServer:         grpc.NewServer(grpc.UnaryInterceptor(unaryInterceptor)),
+		storeContainer:     storeContainer,
+		restoreProgression: progress.NewProgressionWrapper(progress.ChainSyncRestore),
 	}
 
 	m.executor = state.NewExecutor(config.Chain.Params, st, logger)
