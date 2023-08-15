@@ -42,6 +42,9 @@ type Executor struct {
 
 	PostHook        func(txn *Transition)
 	GenesisPostHook func(*Transition) error
+
+	blockReward    *big.Int
+	blockRewardSet bool
 }
 
 // NewExecutor creates a new executor
@@ -156,7 +159,6 @@ func (e *Executor) ProcessBlock(
 		//	Legacy:           true,
 		//}
 		//
-		//// TODO [palm]: remove this!  only in place for debugging EVM
 		//tr := structtracer.NewStructTracer(trCfg)
 		//txn.SetTracer(tr)
 
@@ -172,6 +174,16 @@ func (e *Executor) ProcessBlock(
 	}
 
 	// Palm - now add in the block reward for the creator
+	txn.state.AddBalance(blockCreator, e.getBlockReward())
+
+	return txn, nil
+}
+
+func (e *Executor) getBlockReward() *big.Int {
+	if e.blockRewardSet {
+		return e.blockReward
+	}
+
 	engineConfig := e.config.Engine
 	if engineConfig != nil {
 		if cfgRaw, ok := engineConfig["ibft"]; ok {
@@ -182,7 +194,9 @@ func (e *Executor) ProcessBlock(
 						// we have a block reward so add it in
 						blockReward := new(big.Int)
 						blockReward.SetString(reward, 10)
-						txn.state.AddBalance(blockCreator, blockReward)
+						e.blockReward = blockReward
+						e.blockRewardSet = true
+						return blockReward
 					}
 				}
 			}
@@ -190,7 +204,10 @@ func (e *Executor) ProcessBlock(
 		}
 	}
 
-	return txn, nil
+	// config missing so just return 0
+	e.blockRewardSet = true
+	e.blockReward = big.NewInt(0)
+	return e.blockReward
 }
 
 // StateAt returns snapshot at given root
