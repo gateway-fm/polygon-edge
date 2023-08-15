@@ -587,6 +587,7 @@ func (c *consensusRuntime) calculateCommitEpochInput(
 	})
 
 	for i, addr := range addrSet {
+		c.logger.Debug("validator reward added", "validator", addr, "blocks", uptimeCounter[addr])
 		uptime[i] = &contractsapi.Uptime{
 			Validator:    addr,
 			SignedBlocks: new(big.Int).SetInt64(uptimeCounter[addr]),

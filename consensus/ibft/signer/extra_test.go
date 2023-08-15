@@ -514,7 +514,7 @@ func Test_putIbftExtra(t *testing.T) {
 }
 
 func Test_HexUnmarshallsForPalm(t *testing.T) {
-	rlpHex := "f901b6a00000000000000000000000000000000000000000000000000000000000000000f87e9411781ba3cd85671a6f8481514f84bce660b75919944324df543421b7b3dc29a59fcd2416aa9a4f4717947f9a67f84a010bda3d83493e4f1476f2651b1dab9488cd6a0d883f9104432d729df772131efe44b82094948b655e3a1e3505c57d15f2c5c813e4abad9cb494b49ce87bcb7f8a1dde59bde1b4c18fbf00b424ac808400000000f9010cb8412d7b64bec5c8a17ec70a878625ca37676733cd3ac65a37118571e7df7c4119ca3245537ec3082f46ce04621b2c8c76b4fff6400db3377f65bd7529adae55e89201b841619764d2c72b75c054eba9beb351649633cf3306e39d94c36ca4c2a1de862ba76466b3f06a6fdfde842db54042dca4c4829d5e3537dbb0070f653dd1b3e7e30501b841f310494c49981c2249fdbb8f18ea680f9c74737c64fc663936a26105a9f2cc25567d2f42478c308ded9405f6253ccb894a037afa41e8209c5b920e2245a7f40101b841347b7b0a0bad02f72bcfcec9d4d3b552d326a6c111f8040082ea6297f256143c37b06d4e51be1780e3134c4cdcc374abf3018840ff6ee8c0ba08d5f8886d39ab00"
+	rlpHex := "f87ea00000000000000000000000000000000000000000000000000000000000000000f8549445c09591de259c4a81cdec4779cb50019933ca30941cf698ebfdc7a528ca02760c4d49d1bb0423486c9448d4295c257384b3264a4572f3a1268a45b7095f948ddf64b1e33ae6f333f68c96f5712d327f4cb075808400000000c0"
 	bytes, err := hex.DecodeString(rlpHex)
 	if err != nil {
 		t.Fatal(err)
@@ -528,4 +528,41 @@ func Test_HexUnmarshallsForPalm(t *testing.T) {
 	}
 
 	assert.Equal(t, 5, v.Elems())
+}
+
+func Test_PalmExtraMarshallsToHex(t *testing.T) {
+	rlpHex := "f87ea00000000000000000000000000000000000000000000000000000000000000000f8549445c09591de259c4a81cdec4779cb50019933ca30941cf698ebfdc7a528ca02760c4d49d1bb0423486c9448d4295c257384b3264a4572f3a1268a45b7095f948ddf64b1e33ae6f333f68c96f5712d327f4cb075808400000000c0"
+	bytes, err := hex.DecodeString(rlpHex)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// now remove the validators and add a single one back
+	extra := IstanbulExtra{
+		isPalm:         true,
+		Validators:     validators.NewECDSAValidatorSet(),
+		Vote:           Vote{},
+		CommittedSeals: &SecpSeals{},
+	}
+	err = extra.UnmarshalRLP(bytes)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	newValidator1 := validators.NewECDSAValidator(types.StringToAddress("0x6075ad7bdb9a14e51bad64044342db8682f6ef18"))
+	newValidator2 := validators.NewECDSAValidator(types.StringToAddress("0x9dd45a8acc3d1da8dfb6cda9f3d2110eff780ccf"))
+	newValidator3 := validators.NewECDSAValidator(types.StringToAddress("0xd3cb39e9e2fb57fb16efa4dc96dce66e2ce27221"))
+	extra.Validators = validators.NewECDSAValidatorSet()
+	err = extra.Validators.Add(newValidator1)
+	err = extra.Validators.Add(newValidator2)
+	err = extra.Validators.Add(newValidator3)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	reMarshalled := extra.MarshalRLPTo([]byte{}, EncodeEverything)
+	reHex := hex.EncodeToString(reMarshalled)
+
+	expected := "f869a00000000000000000000000000000000000000000000000000000000000000000f83f946075ad7bdb9a14e51bad64044342db8682f6ef18949dd45a8acc3d1da8dfb6cda9f3d2110eff780ccf94d3cb39e9e2fb57fb16efa4dc96dce66e2ce27221808400000000c0"
+	assert.Equal(t, expected, reHex)
 }
