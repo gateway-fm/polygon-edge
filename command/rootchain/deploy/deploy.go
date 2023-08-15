@@ -546,6 +546,8 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 		})
 	}
 
+	fmt.Println("Sent all of the transactions.  Waiting for the receipts...")
+
 	if err := g.Wait(); err != nil {
 		messageResult := helper.MessageResult{
 			Message: "[ROOTCHAIN - DEPLOY] Successfully deployed the following contracts\n"}
@@ -566,6 +568,8 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 			CommandResults: commandResults}, err
 	}
 
+	fmt.Println("All receipts received")
+
 	for i, result := range results {
 		populatorFn, ok := metadataPopulatorMap[result.Name]
 		if !ok {
@@ -579,6 +583,8 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 	}
 
 	g, ctx = errgroup.WithContext(cmdCtx)
+
+	fmt.Println("Running initializers...")
 
 	for _, contract := range allContracts {
 		contract := contract
@@ -602,11 +608,16 @@ func deployContracts(outputter command.OutputFormatter, client *jsonrpc.Client, 
 		return deploymentResultInfo{RootchainCfg: nil, SupernetID: 0, CommandResults: nil}, err
 	}
 
+	fmt.Println("All initializers ran successfully")
+	fmt.Println("Registering the chain on the stake manager...")
+
 	// register supernets manager on stake manager
 	supernetID, err := registerChainOnStakeManager(txRelayer, rootchainConfig, deployerKey)
 	if err != nil {
 		return deploymentResultInfo{RootchainCfg: nil, SupernetID: 0, CommandResults: nil}, err
 	}
+
+	fmt.Println("Successfully registered the chain on the stake manager")
 
 	return deploymentResultInfo{
 		RootchainCfg:   rootchainConfig,

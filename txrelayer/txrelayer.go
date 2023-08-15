@@ -48,12 +48,17 @@ type TxRelayerImpl struct {
 	lock sync.Mutex
 
 	writer io.Writer
+
+	nonceMap    map[ethgo.Address]uint64
+	nonceMapMtx *sync.Mutex
 }
 
 func NewTxRelayer(opts ...TxRelayerOption) (TxRelayer, error) {
 	t := &TxRelayerImpl{
 		ipAddress:      DefaultRPCAddress,
-		receiptTimeout: 50 * time.Millisecond,
+		receiptTimeout: 1 * time.Second,
+		nonceMapMtx:    &sync.Mutex{},
+		nonceMap:       make(map[ethgo.Address]uint64),
 	}
 	for _, opt := range opts {
 		opt(t)
@@ -89,6 +94,8 @@ func (t *TxRelayerImpl) SendTransaction(txn *ethgo.Transaction, key ethgo.Key) (
 		return nil, err
 	}
 
+	fmt.Println("Sent transaction with hash", txnHash)
+
 	return t.waitForReceipt(txnHash)
 }
 
@@ -101,9 +108,7 @@ func (t *TxRelayerImpl) sendTransactionLocked(txn *ethgo.Transaction, key ethgo.
 	t.lock.Lock()
 	defer t.lock.Unlock()
 
-	txn.From = key.Address()
-
-	nonce, err := t.client.Eth().GetNonce(key.Address(), ethgo.Pending)
+	nonce, err := t.getNextNonce(key.Address())
 	if err != nil {
 		return ethgo.ZeroHash, err
 	}
@@ -147,8 +152,8 @@ func (t *TxRelayerImpl) sendTransactionLocked(txn *ethgo.Transaction, key ethgo.
 
 	if t.writer != nil {
 		_, _ = t.writer.Write([]byte(
-			fmt.Sprintf("[TxRelayer.SendTransaction]\nFrom = %s \nGas = %d \nGas Price = %d\n",
-				txn.From, txn.Gas, txn.GasPrice)))
+			fmt.Sprintf("[TxRelayer.SendTransaction]\nFrom = %s \nGas = %d \nGas Price = %d\nNonce=%v\n",
+				txn.From, txn.Gas, txn.GasPrice, txn.Nonce)))
 	}
 
 	return t.client.Eth().SendRawTransaction(data)
@@ -206,6 +211,33 @@ func (t *TxRelayerImpl) waitForReceipt(hash ethgo.Hash) (*ethgo.Receipt, error) 
 		time.Sleep(t.receiptTimeout)
 		count++
 	}
+}
+
+func (t *TxRelayerImpl) getNextNonce(address ethgo.Address) (uint64, error) {
+	t.nonceMapMtx.Lock()
+	defer t.nonceMapMtx.Unlock()
+
+	nonce, found := t.nonceMap[address]
+
+	if found {
+		nonce++
+	} else {
+		var err error
+		nonce, err = t.client.Eth().GetNonce(address, ethgo.Pending)
+		if err != nil {
+			return 0, err
+		}
+	}
+
+	if t.writer != nil {
+		_, _ = t.writer.Write([]byte(
+			fmt.Sprintf("[TxRelayer.getNextNonce]\nAddress = %s \nNonce = %v\n",
+				address, nonce)))
+	}
+
+	t.nonceMap[address] = nonce
+
+	return nonce, nil
 }
 
 // ConvertTxnToCallMsg converts txn instance to call message
