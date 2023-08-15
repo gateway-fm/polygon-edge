@@ -403,9 +403,36 @@ type StructLogRes struct {
 	Memory        []string          `json:"memory"`
 	Storage       map[string]string `json:"storage"`
 	RefundCounter uint64            `json:"refund,omitempty"`
+	Reason        *string           `json:"reason"`
 }
 
 func (t *StructTracer) GetResult() (interface{}, error) {
+	if t.reason != nil {
+		return nil, t.reason
+	}
+
+	var returnValue string
+
+	if t.err != nil && !errors.Is(t.err, runtime.ErrExecutionReverted) {
+		returnValue = ""
+	} else {
+		returnValue = fmt.Sprintf("%x", t.output)
+	}
+
+	logs := make([]StructLogRes, 0)
+	for _, frame := range t.callStack {
+		logs = append(logs, appendStructLogs(frame, t.Config)...)
+	}
+
+	return &StructTraceResult{
+		Failed:      t.err != nil,
+		Gas:         t.consumedGas,
+		ReturnValue: returnValue,
+		StructLogs:  logs,
+	}, nil
+}
+
+func (t *StructTracer) GetResultLegacy() (interface{}, error) {
 	if t.reason != nil {
 		return nil, t.reason
 	}
@@ -430,42 +457,7 @@ func formatStructLogs(originalLogs []StructLog, config Config) []StructLogRes {
 	res := make([]StructLogRes, len(originalLogs))
 
 	for index, log := range originalLogs {
-		res[index] = StructLogRes{
-			Pc:            log.Pc,
-			Op:            log.Op,
-			Gas:           log.Gas,
-			GasCost:       log.GasCost,
-			Depth:         log.Depth,
-			Error:         log.ErrorString(),
-			RefundCounter: log.RefundCounter,
-		}
-
-		res[index].Stack = make([]string, len(log.Stack))
-
-		for i, value := range log.Stack {
-			if config.Legacy {
-				res[index].Stack[i] = hex.EncodeBigLegacy(value)
-			} else {
-				res[index].Stack[i] = hex.EncodeBig(value)
-			}
-		}
-
-		res[index].Memory = make([]string, 0, (len(log.Memory)+31)/32)
-
-		if log.Memory != nil {
-			for i := 0; i+32 <= len(log.Memory); i += 32 {
-				res[index].Memory = append(
-					res[index].Memory,
-					hex.EncodeToString(log.Memory[i:i+32]),
-				)
-			}
-		}
-
-		res[index].Storage = make(map[string]string)
-
-		for key, value := range log.Storage {
-			res[index].Storage[hex.EncodeToString(key.Bytes())] = hex.EncodeToString(value.Bytes())
-		}
+		res[index] = structLogToRes(log, config)
 	}
 
 	return res
@@ -501,4 +493,106 @@ func appendLogs(frame *callFrame) string {
 	}
 
 	return out
+}
+
+func appendStructLogs(frame *callFrame, config Config) []StructLogRes {
+	var out []StructLogRes
+	for idx, l := range frame.logs {
+		toAppend := structLogToRes(l, config)
+
+		checkForCall(frame, &toAppend)
+
+		if l.Depth > 1 {
+			out = append(out, toAppend)
+		}
+
+		// check if a sub call happened in any of the child frames
+		for _, call := range frame.callFrames {
+			if call.index == idx {
+				out = append(out, appendStructLogs(call, config)...)
+			}
+		}
+
+		if l.Depth == 1 {
+			out = append(out, toAppend)
+		}
+	}
+
+	return out
+}
+
+func checkForCall(frame *callFrame, toAppend *StructLogRes) {
+	if toAppend.Op == "CALL" ||
+		toAppend.Op == "STATICCALL" ||
+		toAppend.Op == "DELEGATECALL" ||
+		toAppend.Op == "CALLCODE" {
+		gas := calculateCallGas(frame, true)
+		toAppend.GasCost -= gas
+	}
+}
+
+func calculateCallGas(frame *callFrame, topLevel bool) uint64 {
+	var gasUsed uint64
+	for idx, l := range frame.logs {
+
+		if l.Op == "CALL" || l.Op == "STATICCALL" || l.Op == "DELEGATECALL" || l.Op == "CALLCODE" {
+			if topLevel {
+				continue
+			}
+			// we're at the start of a subcall so take the cost and minus the subcall costs
+			cost := l.GasCost
+			log := frame.logs[0]
+			frame.logs = frame.logs[1:]
+			cost -= calculateCallGas(frame, false)
+			frame.logs = append([]StructLog{log}, frame.logs...)
+			gasUsed += cost
+		} else {
+			gasUsed += l.GasCost
+		}
+
+		for _, call := range frame.callFrames {
+			if call.index == idx {
+				gasUsed += calculateCallGas(call, false)
+			}
+		}
+	}
+
+	return gasUsed
+}
+
+func structLogToRes(l StructLog, config Config) StructLogRes {
+	toAppend := StructLogRes{
+		Pc:            l.Pc,
+		Op:            l.Op,
+		Gas:           l.Gas,
+		GasCost:       l.GasCost,
+		Depth:         l.Depth,
+		Error:         l.ErrorString(),
+		RefundCounter: l.RefundCounter,
+	}
+
+	toAppend.Stack = make([]string, len(l.Stack))
+
+	for i, value := range l.Stack {
+		toAppend.Stack[i] = hex.EncodeBigLegacy(value)
+	}
+
+	toAppend.Memory = make([]string, 0, (len(l.Memory)+31)/32)
+
+	if l.Memory != nil {
+		for i := 0; i+32 <= len(l.Memory); i += 32 {
+			toAppend.Memory = append(
+				toAppend.Memory,
+				hex.EncodeToString(l.Memory[i:i+32]),
+			)
+		}
+	}
+
+	toAppend.Storage = make(map[string]string)
+
+	for key, value := range l.Storage {
+		toAppend.Storage[hex.EncodeToString(key.Bytes())] = hex.EncodeToString(value.Bytes())
+	}
+
+	return toAppend
 }
