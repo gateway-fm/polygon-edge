@@ -337,7 +337,7 @@ func (p *PalmSyncer) requestNextHeaders(knownHeight uint64, current uint64) bool
 
 	p.setOpenHeaderRequest(reqId, or)
 
-	p.logger.Info("sent get block headers message to peer", "reqId", reqId, "origin", packet.Origin.Number, "amount", packet.Amount, "skip", packet.Skip)
+	p.logger.Debug("sent get block headers message to peer", "reqId", reqId, "origin", packet.Origin.Number, "amount", packet.Amount, "skip", packet.Skip)
 
 	return true
 }
@@ -417,7 +417,7 @@ func (p *PalmSyncer) requestNextBodies(maxHeight uint64, current uint64) bool {
 	}
 	p.setOpenBodiesRequest(reqId, or)
 
-	p.logger.Info("sent get block bodies message to peer", "reqId", reqId, "count", len(numbersInRequest), "blocks", numbersInRequest)
+	p.logger.Debug("sent get block bodies message to peer", "reqId", reqId, "count", len(numbersInRequest), "blocks", numbersInRequest)
 
 	return true
 }
@@ -459,7 +459,7 @@ func (p *PalmSyncer) monitorForPeerResponses() {
 					p.logger.Error("unexpected type when handling a block headers response", "type", reflect.TypeOf(res.Res))
 					continue
 				}
-				p.logger.Info("got block headers response from peer", "reqId", convert.RequestId, "count", len(convert.BlockHeadersPacket))
+				p.logger.Debug("got block headers response from peer", "reqId", convert.RequestId, "count", len(convert.BlockHeadersPacket))
 				p.handleHeaderPeerResponse(convert)
 
 			case devp2p2.BlockBodiesMsg:
@@ -469,7 +469,7 @@ func (p *PalmSyncer) monitorForPeerResponses() {
 					continue
 				}
 				p.handleBodiesPeerResponse(convert)
-				p.logger.Info("got block bodies response from peer", "reqId", convert.RequestId, "count", len(convert.BlockBodiesPacket))
+				p.logger.Debug("got block bodies response from peer", "reqId", convert.RequestId, "count", len(convert.BlockBodiesPacket))
 			default:
 				p.logger.Error("monitoring for peer responses got an unexpected message code", "code", res.Code)
 			}
