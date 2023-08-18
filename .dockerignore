@@ -1,1 +1,6 @@
 docker/local/Dockerfile
+test-chain-1
+test-chain-2
+test-chain-3
+test-chain-4
+test-rootchain
