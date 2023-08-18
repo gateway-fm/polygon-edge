@@ -50,7 +50,7 @@ func (s *StoreContainer) byNumber(blockNumber BlockNumber) JSONRPCStore {
 		if store.To == nil {
 			continue
 		}
-		if uint64(blockNumber) < *store.To {
+		if uint64(blockNumber) <= *store.To {
 			return store.Store
 		}
 	}
@@ -69,16 +69,29 @@ func (s *StoreContainer) byNumber(blockNumber BlockNumber) JSONRPCStore {
 // getByHash will optimise by using the latest store and working backwards until it finds the block
 // or finds nothing in which case it will return an error
 func (s *StoreContainer) byHash(hash types.Hash, full bool) (JSONRPCStore, *types.Block, error) {
-	for i := len(s.stores) - 1; i >= 0; i-- {
-		store := s.stores[i]
-		b, found := store.Store.GetBlockByHash(hash, full)
-		if !found {
-			continue
-		}
-		return store.Store, b, nil
+	// no stores so return an error
+	if len(s.stores) == 0 {
+		return nil, nil, fmt.Errorf("no stores registered")
 	}
 
-	return nil, nil, fmt.Errorf("block %s not found", hash.String())
+	// any store can get the block by hash so use the latest to get the block
+	// then we can determine which store to pass back
+	block, found := s.latest().GetBlockByHash(hash, full)
+	if !found {
+		return nil, nil, fmt.Errorf("block %s not found", hash.String())
+	}
+
+	num := block.Header.Number
+	var store ForkedStore
+	for _, s := range s.stores {
+		store = s
+		if s.To != nil && num <= *s.To {
+			// found the store we want so return
+			break
+		}
+	}
+
+	return store.Store, block, nil
 }
 
 func (s *StoreContainer) byFilter(filter BlockNumberOrHash) (JSONRPCStore, error) {
