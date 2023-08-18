@@ -76,10 +76,24 @@ type TraceConfig struct {
 	Timeout          *string `json:"timeout"`
 }
 
+var debugTimeoutDefault = "5s"
+
+var defaultTraceConfig = &TraceConfig{
+	EnableMemory:     false,
+	DisableStack:     true,
+	DisableStorage:   true,
+	EnableReturnData: false,
+	Timeout:          &debugTimeoutDefault,
+}
+
 func (d *Debug) TraceBlockByNumber(
 	blockNumber BlockNumber,
 	config *TraceConfig,
 ) (interface{}, error) {
+	if config == nil {
+		config = defaultTraceConfig
+	}
+
 	num, store, err := GetNumericBlockNumber(blockNumber, d.storeContainer)
 	if err != nil {
 		return nil, err
@@ -97,6 +111,10 @@ func (d *Debug) TraceBlockByHash(
 	blockHash types.Hash,
 	config *TraceConfig,
 ) (interface{}, error) {
+	if config == nil {
+		config = defaultTraceConfig
+	}
+
 	store, b, err := d.storeContainer.byHash(blockHash, true)
 	if err != nil {
 		return nil, err
@@ -109,6 +127,10 @@ func (d *Debug) TraceBlock(
 	input string,
 	config *TraceConfig,
 ) (interface{}, error) {
+	if config == nil {
+		config = defaultTraceConfig
+	}
+
 	blockByte, decodeErr := hex.DecodeHex(input)
 	if decodeErr != nil {
 		return nil, fmt.Errorf("unable to decode block, %w", decodeErr)
@@ -128,6 +150,10 @@ func (d *Debug) TraceTransaction(
 	txHash types.Hash,
 	config *TraceConfig,
 ) (interface{}, error) {
+	if config == nil {
+		config = defaultTraceConfig
+	}
+
 	tx, b, store, err := GetTxAndBlockByTxHash(txHash, d.storeContainer)
 	if err != nil {
 		return nil, err
@@ -152,6 +178,10 @@ func (d *Debug) TraceCall(
 	filter BlockNumberOrHash,
 	config *TraceConfig,
 ) (interface{}, error) {
+	if config == nil {
+		config = defaultTraceConfig
+	}
+
 	header, store, err := GetHeaderFromBlockNumberOrHash(filter, d.storeContainer)
 	if err != nil {
 		return nil, ErrHeaderNotFound
@@ -182,6 +212,10 @@ func (d *Debug) traceBlock(
 	config *TraceConfig,
 	store JSONRPCStore,
 ) (interface{}, error) {
+	if config == nil {
+		config = defaultTraceConfig
+	}
+
 	if block.Number() == 0 {
 		return nil, ErrTraceGenesisBlock
 	}

@@ -20,7 +20,7 @@ func getBlockData(blockNumber uint64, blockchainBackend blockchainBackend) (*typ
 
 	blockExtra, err := GetIbftExtra(blockHeader.ExtraData)
 	if err != nil {
-		return nil, nil, err
+		return blockHeader, nil, err
 	}
 
 	return blockHeader, blockExtra, nil

@@ -153,7 +153,7 @@ func newConsensusRuntime(log hcf.Logger, config *runtimeConfig) (*consensusRunti
 	// we need to call restart epoch on runtime to initialize epoch state
 	runtime.epoch, err = runtime.restartEpoch(runtime.lastBuiltBlock)
 	if err != nil {
-		return nil, fmt.Errorf("consensus runtime creation - restart epoch failed: %w", err)
+		return nil, fmt.Errorf("consensus runtime creation at block %v - restart epoch failed: %w", runtime.lastBuiltBlock.Number, err)
 	}
 
 	return runtime, nil
@@ -460,7 +460,7 @@ func (c *consensusRuntime) restartEpoch(header *types.Header) (*epochMetadata, e
 
 	firstBlockInEpoch, err := c.getFirstBlockOfEpoch(epochNumber, header)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get first block of epoch: %w", err)
 	}
 
 	if err := c.state.EpochStore.cleanEpochsFromDB(); err != nil {
@@ -960,8 +960,10 @@ func (c *consensusRuntime) getFirstBlockOfEpoch(epochNumber uint64, latestHeader
 		return latestHeader.Number, nil
 	}
 
-	// restarting from an already forked chain
-	if c.config.forkBlock > 0 && epochNumber == 1 {
+	// restarting from an already forked chain.  Because we start the new forked chain in epoch 2 we also need
+	// to default to the fork block because the extra data in the header of the last block from the magic epoch
+	// will be incompatible with polybft code
+	if c.config.forkBlock > 0 && (epochNumber == 1 || epochNumber == 2) {
 		return c.config.forkBlock, nil
 	}
 
@@ -969,6 +971,7 @@ func (c *consensusRuntime) getFirstBlockOfEpoch(epochNumber uint64, latestHeader
 
 	blockExtra, err := GetIbftExtra(latestHeader.ExtraData)
 	if err != nil {
+		c.logger.Error("failed to retrieve extra for block", "err", err, "number", latestHeader.Number, "extra-data", latestHeader.ExtraData)
 		return 0, err
 	}
 
@@ -986,6 +989,7 @@ func (c *consensusRuntime) getFirstBlockOfEpoch(epochNumber uint64, latestHeader
 		firstBlockInEpoch = blockHeader.Number
 		blockHeader, blockExtra, err = getBlockData(blockHeader.Number-1, c.config.blockchain)
 		if err != nil {
+			c.logger.Error("failed to retrieve extra for block", "err", err, "number", blockHeader.Number, "extra-data", blockHeader.ExtraData)
 			return 0, err
 		}
 	}
