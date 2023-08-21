@@ -254,6 +254,10 @@ func (m *Manager) loadNextFork() error {
 					if err != nil {
 						return err
 					}
+					m.logger.Info("Inserted polybft transition block", "height", header.Number+1)
+					fmt.Println()
+					fmt.Println(mascot)
+					fmt.Println()
 				}
 			}
 
@@ -444,7 +448,6 @@ func (m *Manager) insertPolybftForkBlock(
 		MixHash:      types.Hash{},
 		Nonce:        types.Nonce{},
 		Hash:         types.Hash{},
-		BaseFee:      m.Config.Chain.Genesis.BaseFee,
 	}
 	header.ComputeHash()
 
