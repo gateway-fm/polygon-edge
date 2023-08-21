@@ -3,13 +3,14 @@ package genesis
 import (
 	"fmt"
 
+	"github.com/spf13/cobra"
+
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/genesis/predeploy"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/consensus/ibft"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/validators"
-	"github.com/spf13/cobra"
 )
 
 func GetCommand() *cobra.Command {
@@ -192,7 +193,7 @@ func setFlags(cmd *cobra.Command) {
 			"the predefined period which determines block creation frequency",
 		)
 
-		cmd.Flags().Uint64Var(
+		cmd.Flags().StringVar(
 			&params.epochReward,
 			epochRewardFlag,
 			defaultEpochReward,

@@ -103,7 +103,7 @@ type genesisParams struct {
 	validators           []string
 	sprintSize           uint64
 	blockTime            time.Duration
-	epochReward          uint64
+	epochReward          string
 	blockTimeDrift       uint64
 
 	initialStateRoot string

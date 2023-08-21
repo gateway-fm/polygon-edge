@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"math/big"
 
+	"github.com/umbracle/ethgo/abi"
+
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/umbracle/ethgo/abi"
 )
 
 const (
@@ -48,7 +49,7 @@ func initRewardPool(polybftConfig PolyBFTConfig, transition *state.Transition) e
 		NewRewardToken:  polybftConfig.RewardConfig.TokenAddress,
 		NewRewardWallet: polybftConfig.RewardConfig.WalletAddress,
 		NewValidatorSet: contracts.ValidatorSetContract,
-		NewBaseReward:   new(big.Int).SetUint64(polybftConfig.EpochReward),
+		NewBaseReward:   new(big.Int).Set(polybftConfig.EpochReward),
 	}
 
 	input, err := initFn.EncodeAbi()

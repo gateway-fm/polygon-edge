@@ -20,6 +20,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/validator"
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/common"
+	hex2 "github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/server"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -41,7 +42,7 @@ const (
 	defaultSprintSize       = uint64(5)
 	defaultValidatorSetSize = 100
 	defaultBlockTime        = 2 * time.Second
-	defaultEpochReward      = 1
+	defaultEpochReward      = "0x1"
 	defaultBlockTimeDrift   = uint64(10)
 
 	contractDeployerAllowListAdminFlag   = "contract-deployer-allow-list-admin"
@@ -131,12 +132,18 @@ func (p *genesisParams) generatePolyBftChainConfig(o command.OutputFormatter) er
 		}
 	}
 
+	// parse out the reward to a big int
+	reward, err := hex2.DecodeHexToBig(p.epochReward)
+	if err != nil {
+		return fmt.Errorf("failed to parse epoch reward to big int %s, err: %w", p.epochReward, err)
+	}
+
 	polyBftConfig := &polybft.PolyBFTConfig{
 		InitialValidatorSet: initialValidators,
 		BlockTime:           common.Duration{Duration: p.blockTime},
 		EpochSize:           p.epochSize,
 		SprintSize:          p.sprintSize,
-		EpochReward:         p.epochReward,
+		EpochReward:         reward,
 		// use 1st account as governance address
 		Governance:          types.ZeroAddress,
 		InitialTrieRoot:     types.StringToHash(p.initialStateRoot),
