@@ -1370,6 +1370,9 @@ func (b *Blockchain) Close() error {
 // CalculateBaseFee calculates the basefee of the header.
 func (b *Blockchain) CalculateBaseFee(parent *types.Header) uint64 {
 	if !b.config.Params.Forks.IsActive(chain.London, parent.Number) {
+		if b.config.Params.IsPalm() {
+			return 0
+		}
 		return chain.GenesisBaseFee
 	}
 
