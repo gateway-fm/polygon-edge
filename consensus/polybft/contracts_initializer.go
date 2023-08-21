@@ -8,6 +8,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	"github.com/0xPolygon/polygon-edge/contracts"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -45,11 +46,16 @@ func initValidatorSet(polyBFTConfig PolyBFTConfig, transition *state.Transition)
 
 // initRewardPool initializes RewardPool SC
 func initRewardPool(polybftConfig PolyBFTConfig, transition *state.Transition) error {
+	baseReward, err := hex.DecodeHexToBig(polybftConfig.EpochReward)
+	if err != nil {
+		return err
+	}
+
 	initFn := &contractsapi.InitializeRewardPoolFn{
 		NewRewardToken:  polybftConfig.RewardConfig.TokenAddress,
 		NewRewardWallet: polybftConfig.RewardConfig.WalletAddress,
 		NewValidatorSet: contracts.ValidatorSetContract,
-		NewBaseReward:   new(big.Int).Set(polybftConfig.EpochReward),
+		NewBaseReward:   baseReward,
 	}
 
 	input, err := initFn.EncodeAbi()
