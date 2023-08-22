@@ -6,7 +6,7 @@ COPY . .
 RUN CGO_ENABLED=0 GOOS=linux go build -o /app/polygon-edge
 RUN apk update
 RUN apk add jq
-RUN ./scripts/palm-genesis-testnet.sh
+RUN ./scripts/palm-genesis-mainnet.sh
 
 FROM alpine:3.18 as runner
 COPY --from=builder /app/polygon-edge /app/polygon-edge

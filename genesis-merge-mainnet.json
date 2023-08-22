@@ -1,0 +1,89 @@
+{
+	"name": "palm",
+	"genesis": {
+		"extraData": "0xf893a00000000000000000000000000000000000000000000000000000000000000000f869947f9a67f84a010bda3d83493e4f1476f2651b1dab94948b655e3a1e3505c57d15f2c5c813e4abad9cb49411781ba3cd85671a6f8481514f84bce660b759199488cd6a0d883f9104432d729df772131efe44b82094b49ce87bcb7f8a1dde59bde1b4c18fbf00b424ac808400000000c0",
+		"gasLimit": "0x11EDD80",
+		"mixHash": "0x63746963616c2062797a616e74696e65206661756c7420746f6c6572616e6365",
+		"difficulty": "0x1",
+		"number": "0x0",
+		"gasUsed": "0x0",
+		"parentHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+		"baseFee": "0x0",
+		"baseFeeEM": "0x0",
+		"alloc": {
+			"0xDf4FE27cb676166a78EAE18bdB1D6Dc996635A50": {
+				"balance": "1000000000000000000000000000"
+			}
+		}
+	},
+	"params": {
+		"forks": {
+			"homestead": {
+				"block": 0
+			},
+			"byzantium": {
+				"block": 0
+			},
+			"constantinople": {
+				"block": 0
+			},
+			"petersburg": {
+				"block": 0
+			},
+			"istanbul": {
+				"block": 0
+			},
+			"berlin": {
+				"block": 0
+			},
+			"EIP150": {
+				"block": 0
+			},
+			"EIP158": {
+				"block": 0
+			},
+			"EIP155": {
+				"block": 0
+			},
+			"EIP2929": {
+				"block": 0
+			},
+			"EIP2930": {
+				"block": 0
+			}
+		},
+		"chainID": 11297108109,
+		"engine": {
+			"ibft": {
+				"type": "PoA",
+				"validator_type": "ecdsa",
+				"blockperiodseconds": 5,
+				"blockTime": "5s",
+				"epochlength": 30000,
+				"blockreward": "114085402000000000",
+				"requesttimeoutseconds": 10
+			},
+			"polybft": {
+				"blockTime": "5s"
+			}
+		},
+		"engineForks": [
+			{
+				"engine": "ibft",
+				"to": 30000000
+			},
+			{
+				"engine": "polybft",
+				"to": null,
+				"baseFee": "0x0",
+				"baseFeeEM": "0x0",
+				"gasLimit": "0x11EDD80",
+				"gasUsed": "0x70000",
+				"alloc": {}
+			}
+		]
+	},
+	"devp2pBootnodes": [
+		"enode://71237587e283da84fec1b7b5ef8d86cc6b9720c570f55b64666ef9f0c7ed9552725616abd3657c9665f5cf184151153f70ddc63bb0ad9472300ab26a675b3167@94.156.203.175:30303"
+	]
+}

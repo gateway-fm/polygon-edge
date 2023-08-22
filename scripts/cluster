@@ -70,13 +70,16 @@ function initPolybftConsensus() {
 
 function createGenesis() {
   ./polygon-edge genesis $genesis_params \
+    --chain-id 11297108099 \
     --block-gas-limit 10000000 \
     --premine 0x85da99c8a7c2c95964c8efd687e95e632fc533d6:1000000000000000000000 \
-    --premine 0x0000000000000000000000000000000000000000 \
+    --block-gas-limit 18800000 \
     --epoch-size 10 \
-    --reward-wallet 0xDEADBEEF:1000000 \
-    --native-token-config "Polygon:MATIC:18:true:$address1" \
-    --burn-contract 0:0x0000000000000000000000000000000000000000
+    --epoch-reward 1000 \
+    --reward-wallet 0xDEADBEEF:1000000000000000000000 \
+    --epoch-reward "0x473F1317100B34000" \
+    --native-token-config "Palm Token:PALM:18:true:$address1" \
+    --premine 0x0
 }
 
 function initRootchain() {
@@ -158,7 +161,7 @@ function startServerFromBinary() {
   if [ "$1" == "write-logs" ]; then
     echo "Writing validators logs to the files..."
     ./polygon-edge server --data-dir ./test-chain-1 --chain genesis.json \
-      --grpc-address :10000 --libp2p :30301 --devp2p :30601 --jsonrpc :10002 --relayer \
+      --grpc-address :10000 --libp2p :30301 --devp2p :30601 --jsonrpc :10004 --relayer \
       --num-block-confirmations 2 --seal --log-level DEBUG 2>&1 | tee ./validator-1.log &
     ./polygon-edge server --data-dir ./test-chain-2 --chain genesis.json \
       --grpc-address :20000 --libp2p :30302 --devp2p :30602 --jsonrpc :20002 \
@@ -172,7 +175,7 @@ function startServerFromBinary() {
     wait
   else
     ./polygon-edge server --data-dir ./test-chain-1 --chain genesis.json \
-      --grpc-address :10000 --libp2p :30301 --devp2p :30601 --jsonrpc :10002 --relayer \
+      --grpc-address :10000 --libp2p :30301 --devp2p :30601 --jsonrpc :10004 --relayer \
       --num-block-confirmations 2 --seal --log-level DEBUG &
     ./polygon-edge server --data-dir ./test-chain-2 --chain genesis.json \
       --grpc-address :20000 --libp2p :30302 --devp2p :30602 --jsonrpc :20002 \
