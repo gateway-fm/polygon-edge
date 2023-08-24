@@ -338,14 +338,8 @@ func (c *checkpointManager) PostBlock(req *PostBlockRequest) error {
 	isCheckpoint := c.isCheckpointBlock(req.FullBlock.Block.Header.Number, req.IsEpochEndingBlock)
 	isActiveMiner := bytes.Equal(c.key.Address().Bytes(), req.FullBlock.Block.Header.Miner)
 
-	c.logger.Debug("checking to send checkpoint to root chain",
-		"blockNumber", req.FullBlock.Block.Header.Number,
-		"isEpochEndingBlock", req.IsEpochEndingBlock,
-		"isCheckpoint", isCheckpoint,
-		"activeMiner", isActiveMiner)
-
 	if isCheckpoint && isActiveMiner {
-		c.logger.Debug("sending checkpoint to rootchain")
+		c.logger.Info("sending checkpoint to rootchain")
 		go func(header *types.Header, epochNumber uint64) {
 			if err := c.submitCheckpoint(header, req.IsEpochEndingBlock); err != nil {
 				c.logger.Warn("failed to submit checkpoint",

@@ -133,7 +133,7 @@ func (m *Manager) Start() error {
 	if len(m.Config.Chain.Params.EngineForks) == 0 {
 		m.logger.Info("no forks detected, running in simple mode")
 		// no forks, just start the default server
-		srv, err := m.createServer(m.Config, 0)
+		srv, err := m.createServer(m.Config, 0, m.Config.Relayer)
 		if err != nil {
 			return err
 		}
@@ -156,6 +156,7 @@ func (m *Manager) Start() error {
 func (m *Manager) createServer(
 	config *Config,
 	forkNumber int,
+	isRelayer bool,
 ) (*Server, error) {
 	return NewManagedServer(
 		config,
@@ -167,6 +168,7 @@ func (m *Manager) createServer(
 		m.db,
 		forkNumber,
 		m.storeContainer,
+		isRelayer,
 	)
 }
 
@@ -239,8 +241,14 @@ func (m *Manager) loadNextFork() error {
 		// beyond the fork point
 		m.Config.Chain.Params.StopBlock = fork.To
 
+		isRelayer := m.Config.Relayer
+		if fork.Engine != "polybft" {
+			// we only want to run as a relayer if the network is polybft
+			isRelayer = false
+		}
+
 		// create the server for side effects even if we don't intend on running it
-		srv, err := m.createServer(m.Config, forkNumber)
+		srv, err := m.createServer(m.Config, forkNumber, isRelayer)
 		if err != nil {
 			return err
 		}

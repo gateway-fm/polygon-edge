@@ -537,6 +537,7 @@ func (p *Polybft) initRuntime() error {
 		numBlockConfirmations: p.config.NumBlockConfirmations,
 		fromForked:            p.config.FromForked,
 		forkBlock:             p.config.Config.Params.ForkBlock,
+		isPalm:                p.config.Config.Params.IsPalm(),
 	}
 
 	runtime, err := newConsensusRuntime(p.logger, runtimeConfig)

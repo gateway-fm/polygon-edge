@@ -100,6 +100,8 @@ type Server struct {
 
 	jsonHub        *jsonRPCHub
 	storeContainer *jsonrpc.StoreContainer
+
+	isRelayer bool
 }
 
 // newFileLogger returns logger instance that writes all logs to a specified file.
@@ -153,6 +155,7 @@ func NewManagedServer(
 	db storage.Storage,
 	forkNumber int,
 	storeContainer *jsonrpc.StoreContainer,
+	isRelayer bool,
 ) (*Server, error) {
 	m := &Server{
 		config:             config,
@@ -165,6 +168,7 @@ func NewManagedServer(
 		grpcServer:         grpc.NewServer(grpc.UnaryInterceptor(unaryInterceptor)),
 		storeContainer:     storeContainer,
 		restoreProgression: progress.NewProgressionWrapper(progress.ChainSyncRestore),
+		isRelayer:          isRelayer,
 	}
 
 	m.executor = state.NewExecutor(config.Chain.Params, st, logger)
@@ -497,7 +501,7 @@ func (m *Server) start() error {
 	}
 
 	// start relayer
-	if m.config.Relayer {
+	if m.isRelayer {
 		if err := m.setupRelayer(); err != nil {
 			return err
 		}
@@ -711,6 +715,7 @@ func (s *Server) setupRelayer() error {
 		trackerStartBlockConfig[contracts.StateReceiverContract],
 		s.logger.Named("relayer"),
 		wallet.NewEcdsaSigner(wallet.NewKey(account)),
+		s.config.Chain.Params.IsPalm(),
 	)
 
 	// start relayer

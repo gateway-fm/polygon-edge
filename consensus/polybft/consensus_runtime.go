@@ -82,6 +82,7 @@ type runtimeConfig struct {
 	numBlockConfirmations uint64
 	fromForked            bool
 	forkBlock             uint64
+	isPalm                bool
 }
 
 // consensusRuntime is a struct that provides consensus runtime features like epoch, state and event management
@@ -181,6 +182,7 @@ func (c *consensusRuntime) initStateSyncManager(logger hcf.Logger) error {
 				topic:                 c.config.bridgeTopic,
 				maxCommitmentSize:     maxCommitmentSize,
 				numBlockConfirmations: c.config.numBlockConfirmations,
+				isPalm:                c.config.isPalm,
 			},
 			c,
 		)

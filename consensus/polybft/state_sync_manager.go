@@ -9,6 +9,11 @@ import (
 	"path"
 	"sync"
 
+	"github.com/hashicorp/go-hclog"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"github.com/umbracle/ethgo"
+	"google.golang.org/protobuf/proto"
+
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
 	polybftProto "github.com/0xPolygon/polygon-edge/consensus/polybft/proto"
@@ -17,10 +22,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/tracker"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/hashicorp/go-hclog"
-	"github.com/libp2p/go-libp2p/core/peer"
-	"github.com/umbracle/ethgo"
-	"google.golang.org/protobuf/proto"
 )
 
 type Runtime interface {
@@ -68,6 +69,7 @@ type stateSyncConfig struct {
 	key                   *wallet.Key
 	maxCommitmentSize     uint64
 	numBlockConfirmations uint64
+	isPalm                bool
 }
 
 var _ StateSyncManager = (*stateSyncManager)(nil)
@@ -137,7 +139,8 @@ func (s *stateSyncManager) initTracker() error {
 		s,
 		s.config.numBlockConfirmations,
 		s.config.stateSenderStartBlock,
-		s.logger)
+		s.logger,
+		s.config.isPalm)
 
 	go func() {
 		<-s.closeCh
