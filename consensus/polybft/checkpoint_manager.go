@@ -294,8 +294,10 @@ func (c *checkpointManager) abiEncodeCheckpointBlock(blockNumber uint64, blockHa
 // isCheckpointBlock returns true for blocks in the middle of the epoch
 // which are offset by predefined count of blocks
 // or if given block is an epoch ending block
-func (c *checkpointManager) isCheckpointBlock(blockNumber uint64, isEpochEndingBlock bool) bool {
-	return isEpochEndingBlock || blockNumber == c.lastSentBlock+c.checkpointsOffset
+func (c *checkpointManager) isCheckpointBlock(_ uint64, isEpochEndingBlock bool) bool {
+	// PALM - removing this check for the intermediate checkpoints as we are not using them
+	//return isEpochEndingBlock || blockNumber == c.lastSentBlock+c.checkpointsOffset
+	return isEpochEndingBlock
 }
 
 // PostBlock is called on every insert of finalized block (either from consensus or syncer)
