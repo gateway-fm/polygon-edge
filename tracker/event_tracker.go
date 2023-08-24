@@ -1,7 +1,6 @@
 package tracker
 
 import (
-	"bytes"
 	"context"
 	"time"
 
@@ -11,7 +10,6 @@ import (
 	"github.com/umbracle/ethgo/jsonrpc"
 	"github.com/umbracle/ethgo/tracker"
 
-	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 )
 
@@ -64,17 +62,6 @@ func (e *EventTracker) Start(ctx context.Context) error {
 	provider, err := jsonrpc.NewClient(e.rpcEndpoint)
 	if err != nil {
 		return err
-	}
-
-	startBlock := e.startBlock
-	if e.isPalm && !bytes.Equal(e.contractAddr.Bytes(), contracts.StateReceiverContract.Bytes()) {
-		latest, err := provider.Eth().GetBlockByNumber(ethgo.Latest, false)
-		if err != nil {
-			e.logger.Error("could not get latest block to update event tracker start block", "error", err)
-		}
-		// go back 10 blocks to ensure we capture everything that could have happened during the transition phase
-		startBlock = latest.Number - 10
-		e.logger.Info("updated block tracker start block", "new-block", startBlock)
 	}
 
 	store, err := NewEventTrackerStore(e.dbPath, e.numBlockConfirmations, e.subscriber, e.logger)
@@ -130,7 +117,7 @@ func (e *EventTracker) Start(ctx context.Context) error {
 			Address: []ethgo.Address{
 				e.contractAddr,
 			},
-			Start: startBlock,
+			Start: e.startBlock,
 		}),
 	)
 	if err != nil {
