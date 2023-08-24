@@ -133,7 +133,7 @@ func (m *Manager) Start() error {
 	if len(m.Config.Chain.Params.EngineForks) == 0 {
 		m.logger.Info("no forks detected, running in simple mode")
 		// no forks, just start the default server
-		srv, err := m.createServer(m.Config, 0, m.Config.Relayer)
+		srv, err := m.createServer(m.Config, 0, m.Config.Relayer, "")
 		if err != nil {
 			return err
 		}
@@ -157,6 +157,7 @@ func (m *Manager) createServer(
 	config *Config,
 	forkNumber int,
 	isRelayer bool,
+	txHandoff string,
 ) (*Server, error) {
 	return NewManagedServer(
 		config,
@@ -169,6 +170,7 @@ func (m *Manager) createServer(
 		forkNumber,
 		m.storeContainer,
 		isRelayer,
+		txHandoff,
 	)
 }
 
@@ -242,13 +244,31 @@ func (m *Manager) loadNextFork() error {
 		m.Config.Chain.Params.StopBlock = fork.To
 
 		isRelayer := m.Config.Relayer
-		if fork.Engine != "polybft" {
+
+		switch fork.Engine {
+		case "polybft":
+			// ensure that the state sender address in the engine config is set to start
+			// tracking from the fork point height otherwise it will start at 0 which will
+			// need a lot of blocks syncing that couldn't contain any events
+			if lastFork.To != nil {
+				cfg, ok := newEngineParams["polybft"].(map[string]interface{})
+				if ok {
+					cfg, ok = cfg["bridge"].(map[string]interface{})
+					if ok {
+						cfg, ok = cfg["eventTrackerStartBlocks"].(map[string]interface{})
+						if ok {
+							cfg[contracts.StateReceiverContract.String()] = *lastFork.To
+						}
+					}
+				}
+			}
+		default:
 			// we only want to run as a relayer if the network is polybft
 			isRelayer = false
 		}
 
 		// create the server for side effects even if we don't intend on running it
-		srv, err := m.createServer(m.Config, forkNumber, isRelayer)
+		srv, err := m.createServer(m.Config, forkNumber, isRelayer, fork.TxHandoff)
 		if err != nil {
 			return err
 		}

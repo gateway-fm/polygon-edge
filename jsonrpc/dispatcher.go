@@ -14,6 +14,7 @@ import (
 
 	"github.com/armon/go-metrics"
 	"github.com/hashicorp/go-hclog"
+	"github.com/umbracle/ethgo/jsonrpc"
 )
 
 type serviceData struct {
@@ -59,6 +60,10 @@ type dispatcherParams struct {
 	priceLimit              uint64
 	jsonRPCBatchLengthLimit uint64
 	blockRangeLimit         uint64
+
+	// txHandoff is the address of a tx-handoff service to send transactions to, if one is not present the
+	// tx relayer won't be created
+	txHandoff string
 }
 
 func (dp dispatcherParams) isExceedingBatchLengthLimit(value uint64) bool {
@@ -94,6 +99,15 @@ func (d *Dispatcher) registerEndpoints(container *StoreContainer) error {
 		d.params.chainID,
 		d.filterManager,
 		d.params.priceLimit,
+		nil,
+	}
+
+	if d.params.txHandoff != "" {
+		client, err := jsonrpc.NewClient(d.params.txHandoff)
+		if err != nil {
+			return err
+		}
+		d.endpoints.Eth.txRelayer = client
 	}
 
 	// some endpoints do not need to handle history and only care about the latest store using the latest consensus

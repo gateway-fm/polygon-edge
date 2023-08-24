@@ -7,6 +7,7 @@ import (
 	"math/big"
 
 	"github.com/hashicorp/go-hclog"
+	"github.com/umbracle/ethgo/jsonrpc"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/gasprice"
@@ -95,6 +96,9 @@ type Eth struct {
 	chainID        uint64
 	filterManager  *FilterManager
 	priceLimit     uint64
+
+	// txRelayer will forward on calls to eth_sendRawTransaction if one is provided
+	txRelayer *jsonrpc.Client
 }
 
 var (
@@ -213,6 +217,16 @@ func (e *Eth) BlockNumber() (interface{}, error) {
 
 // SendRawTransaction sends a raw transaction
 func (e *Eth) SendRawTransaction(buf argBytes) (interface{}, error) {
+	if e.txRelayer != nil {
+		// if a tx handoff has been configured then we should redirect transaction calls using the relayer
+		hash, err := e.txRelayer.Eth().SendRawTransaction(buf)
+		if err != nil {
+			return nil, err
+		}
+		e.logger.Info("relayed transaction", "hash", hash.String())
+		return hash.String(), nil
+	}
+
 	tx := &types.Transaction{}
 	if err := tx.UnmarshalRLP(buf); err != nil {
 		return nil, err

@@ -112,6 +112,7 @@ type Forks map[string]Fork
 type EngineFork struct {
 	Engine    string  `json:"engine"`
 	To        *uint64 `json:"to"`
+	TxHandoff string  `json:"txHandoff"`
 	BaseFee   *string `json:"baseFee"`
 	BaseFeeEM *string `json:"baseFeeEM"`
 	GasLimit  *string `json:"gasLimit"`

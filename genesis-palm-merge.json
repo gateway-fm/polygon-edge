@@ -62,19 +62,23 @@
         "epochlength": 30000,
         "blockreward": "114085402000000000",
         "requesttimeoutseconds": 10
+      },
+      "polybft": {
+        "blockTime": "5s"
       }
     },
     "engineForks": [
       {
         "engine": "ibft",
-        "to": 100
+        "to": 100000,
+        "txHandoff": "http://localhost:8565"
       },
       {
         "engine": "polybft",
         "to": null,
-        "baseFee": "0x3b9aca00",
-        "baseFeeEM": "0x2",
-        "gasLimit": "0x989680",
+        "baseFee": "0x0",
+        "baseFeeEM": "0x0",
+        "gasLimit": "0x11EDD80",
         "gasUsed": "0x70000",
         "alloc": {
 
