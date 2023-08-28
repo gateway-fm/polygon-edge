@@ -378,46 +378,6 @@ func (m *Manager) insertPolybftForkBlock(
 		return err
 	}
 
-	// now we have our genesis contracts in place we need to end the first epoch at the fork block
-	epochCommit := &contractsapi.CommitEpochValidatorSetFn{
-		ID: new(big.Int).SetUint64(1),
-		Epoch: &contractsapi.Epoch{
-			StartBlock: new(big.Int).SetUint64(1),
-			EndBlock:   new(big.Int).SetUint64(h.Number),
-			EpochRoot:  types.Hash{},
-		},
-	}
-
-	input, err := epochCommit.EncodeAbi()
-	if err != nil {
-		return err
-	}
-
-	tx := &types.Transaction{
-		From:     contracts.SystemCaller,
-		To:       &contracts.ValidatorSetContract,
-		Type:     types.StateTx,
-		Input:    input,
-		Gas:      types.StateTransactionGasLimit,
-		GasPrice: big.NewInt(0),
-	}
-	tx.ComputeHash(h.Number)
-
-	transition, err := executor.BeginTxn(newStateRoot, h, types.ZeroAddress)
-	if err != nil {
-		return err
-	}
-
-	err = transition.Write(tx)
-	if err != nil {
-		return err
-	}
-
-	_, newStateRoot, err = transition.Commit()
-	if err != nil {
-		return err
-	}
-
 	polyCfg, err := polybft.GetPolyBFTConfig(m.Config.Chain)
 	if err != nil {
 		return err
@@ -449,7 +409,7 @@ func (m *Manager) insertPolybftForkBlock(
 		Committed: &polybft.Signature{},
 		Checkpoint: &polybft.CheckpointData{
 			BlockRound:            1,
-			EpochNumber:           2,
+			EpochNumber:           1,
 			CurrentValidatorsHash: types.Hash{},
 			NextValidatorsHash:    types.Hash{},
 			EventRoot:             types.Hash{},

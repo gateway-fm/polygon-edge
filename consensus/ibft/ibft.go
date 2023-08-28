@@ -475,9 +475,6 @@ func (i *backendIBFT) VerifyHeader(header *types.Header) error {
 	//hashForCommitment := header.ComputeHashWithoutSeals()
 	//_ = hashForCommitment
 
-	// TODO [palm]: verify the CommitmentSeals - need to figure out how a proposal hash should
-	//  be created - address reversal from the signatures isn't matching with validators
-
 	//hashForCommittedSeal, err := i.calculateProposalHash(
 	//	headerSigner,
 	//	header,

@@ -197,7 +197,6 @@ func (i *backendIBFT) buildBlock(parent *types.Header) (*types.Block, error) {
 		return nil, err
 	}
 
-	// TODO [palm] - can we just pass an empty vote here?
 	i.currentSigner.InitIBFTExtra(header, i.currentValidators, parentCommittedSeals, signer.Vote{})
 
 	transition, err := i.executor.BeginTxn(parent.StateRoot, header, i.currentSigner.Address())

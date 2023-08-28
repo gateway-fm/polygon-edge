@@ -596,6 +596,14 @@ func (c *consensusRuntime) calculateCommitEpochInput(
 		}
 	}
 
+	firstBlockInEpoch := epoch.FirstBlockInEpoch
+	if c.config.forkBlock > 0 && firstBlockInEpoch == c.config.forkBlock {
+		// PALM - because we are ahead of genesis we need to seal the first epoch from block
+		// 1 rather than the actual height in order for the smart contract to be happy about this
+		// first epoch.  The size of the epoch must also be divisible by the epoch size
+		firstBlockInEpoch = 1
+	}
+
 	c.logger.Debug("calculateCommitEpochInput",
 		"epochId", epochID,
 		"startBlock", epoch.FirstBlockInEpoch-c.config.forkBlock,
@@ -607,7 +615,7 @@ func (c *consensusRuntime) calculateCommitEpochInput(
 	commitEpoch := &contractsapi.CommitEpochValidatorSetFn{
 		ID: new(big.Int).SetUint64(epochID),
 		Epoch: &contractsapi.Epoch{
-			StartBlock: new(big.Int).SetUint64(epoch.FirstBlockInEpoch),
+			StartBlock: new(big.Int).SetUint64(firstBlockInEpoch),
 			EndBlock:   new(big.Int).SetUint64(currentBlock.Number + 1),
 			EpochRoot:  types.Hash{},
 		},
@@ -962,10 +970,9 @@ func (c *consensusRuntime) getFirstBlockOfEpoch(epochNumber uint64, latestHeader
 		return latestHeader.Number, nil
 	}
 
-	// restarting from an already forked chain.  Because we start the new forked chain in epoch 2 we also need
-	// to default to the fork block because the extra data in the header of the last block from the magic epoch
-	// will be incompatible with polybft code
-	if c.config.forkBlock > 0 && (epochNumber == 1 || epochNumber == 2) {
+	// restarting from an already forked chain.  Ensure we start from the fork block for the first epoch
+	// when running in a forked context
+	if c.config.forkBlock > 0 && epochNumber == 1 {
 		return c.config.forkBlock, nil
 	}
 

@@ -218,13 +218,6 @@ LOOP:
 			}
 
 			if headOk && bodyOk {
-
-				// Todo [palm] - remove this - purely for faster breakpoints while debugging
-				if header.Number == 2111200 {
-					foo := 1
-					_ = foo
-				}
-
 				block := &types.Block{
 					Header:       header,
 					Transactions: body.Transactions,

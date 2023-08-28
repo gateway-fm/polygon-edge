@@ -135,8 +135,8 @@ func (c *checkpointManager) submitCheckpoint(latestHeader *types.Header, isEndOf
 
 	if lastCheckpointBlockNumber == 0 {
 		if c.forkBlock > 0 {
-			c.logger.Info("checkpoint manager updating last block to handle fork", "lastCheckpointBlockNumber", lastCheckpointBlockNumber, "forkBlock", c.forkBlock)
 			lastCheckpointBlockNumber = c.forkBlock
+			c.logger.Info("checkpoint manager updating last block to handle fork", "lastCheckpointBlockNumber", lastCheckpointBlockNumber, "forkBlock", c.forkBlock)
 		}
 	}
 
@@ -180,7 +180,6 @@ func (c *checkpointManager) submitCheckpoint(latestHeader *types.Header, isEndOf
 		parentEpochNumber := parentExtra.Checkpoint.EpochNumber
 		currentEpochNumber := currentExtra.Checkpoint.EpochNumber
 		// send pending checkpoints only for epoch ending blocks
-		// todo [palm] - are we right in our logic here?
 		if blockNumber == 1 || blockNumber == c.forkBlock || parentEpochNumber == currentEpochNumber {
 			parentHeader = currentHeader
 			parentExtra = currentExtra
