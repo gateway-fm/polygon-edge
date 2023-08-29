@@ -470,7 +470,7 @@ func (f *FilterManager) getLogsFromBlocks(query *LogQuery) ([]*Log, error) {
 // GetLogsForQuery return array of logs for given query
 func (f *FilterManager) GetLogsForQuery(query *LogQuery) ([]*Log, error) {
 	if query.BlockHash != nil {
-		_, b, err := f.storeContainer.byHash(*query.BlockHash, false)
+		_, b, err := f.storeContainer.byHash(*query.BlockHash, true)
 		if err != nil {
 			return nil, err
 		}
