@@ -1,4 +1,4 @@
-name: Bui
+name: Build Edge image and push to DockerHub
 
 on:
   push:
