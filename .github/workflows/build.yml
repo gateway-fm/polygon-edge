@@ -13,9 +13,7 @@ jobs:
   build:
     name: Build and publish Docker image
     if: ${{ github.ref == 'refs/heads/palm-migration' }}
-    runs-on:
-      - self-hosted
-      - dev
+    runs-on: ubuntu-latest
 
     outputs:
       release_tag: ${{ steps.tag_version.outputs.new_tag }}
