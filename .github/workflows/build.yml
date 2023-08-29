@@ -12,7 +12,7 @@ concurrency:
 jobs:
   build:
     name: Build and publish Docker image
-    if: ${{ github.ref == 'refs/heads/main' }}
+    if: ${{ github.ref == 'refs/heads/palm-migration' }}
     runs-on:
       - self-hosted
       - dev
