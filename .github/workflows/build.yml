@@ -40,6 +40,7 @@ jobs:
         with:
           context: .
           push: true
+          file: Dockerfile.mainnet
           tags: |
             gatewayfm/polygon-edge:mainnet-latest
             gatewayfm/polygon-edge:mainnet-${{ steps.tag_version.outputs.new_tag }}
@@ -49,6 +50,7 @@ jobs:
         with:
           context: .
           push: true
+          file: Dockerfile.testnet
           tags: |
             gatewayfm/polygon-edge:testnet-latest
             gatewayfm/polygon-edge:testnet-${{ steps.tag_version.outputs.new_tag }}
