@@ -4,6 +4,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/spf13/cobra"
+	"github.com/umbracle/ethgo"
+
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
 	"github.com/0xPolygon/polygon-edge/command/polybftsecrets"
@@ -12,8 +15,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/spf13/cobra"
-	"github.com/umbracle/ethgo"
 )
 
 var params withdrawRewardsParams
@@ -69,7 +70,8 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 	rewardPoolAddr := ethgo.Address(contracts.RewardPoolContract)
 
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(params.jsonRPC),
-		txrelayer.WithReceiptTimeout(150*time.Millisecond))
+		txrelayer.WithReceiptTimeout(150*time.Millisecond),
+		txrelayer.EnableNonceMap())
 	if err != nil {
 		return err
 	}

@@ -49,6 +49,7 @@ type TxRelayerImpl struct {
 
 	writer io.Writer
 
+	useNonceMap bool
 	nonceMap    map[ethgo.Address]uint64
 	nonceMapMtx *sync.Mutex
 }
@@ -57,6 +58,7 @@ func NewTxRelayer(opts ...TxRelayerOption) (TxRelayer, error) {
 	t := &TxRelayerImpl{
 		ipAddress:      DefaultRPCAddress,
 		receiptTimeout: 1 * time.Second,
+		useNonceMap:    false,
 		nonceMapMtx:    &sync.Mutex{},
 		nonceMap:       make(map[ethgo.Address]uint64),
 	}
@@ -217,6 +219,14 @@ func (t *TxRelayerImpl) getNextNonce(address ethgo.Address) (uint64, error) {
 	t.nonceMapMtx.Lock()
 	defer t.nonceMapMtx.Unlock()
 
+	if !t.useNonceMap {
+		nonce, err := t.client.Eth().GetNonce(address, ethgo.Pending)
+		if err != nil {
+			return 0, err
+		}
+		return nonce, nil
+	}
+
 	nonce, found := t.nonceMap[address]
 
 	if found {
@@ -253,6 +263,12 @@ func ConvertTxnToCallMsg(txn *ethgo.Transaction) *ethgo.CallMsg {
 }
 
 type TxRelayerOption func(*TxRelayerImpl)
+
+func EnableNonceMap() TxRelayerOption {
+	return func(t *TxRelayerImpl) {
+		t.useNonceMap = true
+	}
+}
 
 func WithClient(client *jsonrpc.Client) TxRelayerOption {
 	return func(t *TxRelayerImpl) {

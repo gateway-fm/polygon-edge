@@ -7,11 +7,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/0xPolygon/polygon-edge/helper/common"
 	hcf "github.com/hashicorp/go-hclog"
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/tracker/store"
 	bolt "go.etcd.io/bbolt"
+
+	"github.com/0xPolygon/polygon-edge/helper/common"
 )
 
 const dbLastBlockPrefix = "lastBlock_"
@@ -134,6 +135,7 @@ func (b *EventTrackerStore) Set(k, v string) error {
 
 func (b *EventTrackerStore) onNewBlock(filterHash, blockData string) error {
 	var block ethgo.Block
+	b.logger.Debug("New block", "filterHash", filterHash)
 
 	bytes, err := hex.DecodeString(blockData)
 	if err != nil {
@@ -150,6 +152,7 @@ func (b *EventTrackerStore) onNewBlock(filterHash, blockData string) error {
 
 	entry, err := b.getImplEntry(filterHash)
 	if err != nil {
+		b.logger.Debug("Failed to get entry", "err", err)
 		return nil
 	}
 
@@ -159,8 +162,11 @@ func (b *EventTrackerStore) onNewBlock(filterHash, blockData string) error {
 	}
 
 	if len(logs) == 0 {
+		b.logger.Debug("No logs to process", "block", block.Number, "confirmations", b.numBlockConfirmations, "filterHash", filterHash)
 		return nil // nothing to process
 	}
+
+	b.logger.Debug("Found logs to process...", "len", len(logs), "block", block.Number, "confirmations", b.numBlockConfirmations, "filterHash", filterHash)
 
 	// notify subscriber with logs
 	for _, log := range logs {

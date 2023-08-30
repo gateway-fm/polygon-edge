@@ -227,7 +227,9 @@ func (c *consensusRuntime) initCheckpointManager(logger hcf.Logger) error {
 
 // initStakeManager initializes stake manager
 func (c *consensusRuntime) initStakeManager(logger hcf.Logger) error {
-	rootRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(c.config.PolyBFTConfig.Bridge.JSONRPCEndpoint))
+	rootRelayer, err := txrelayer.NewTxRelayer(
+		txrelayer.WithIPAddress(c.config.PolyBFTConfig.Bridge.JSONRPCEndpoint),
+	)
 	if err != nil {
 		return err
 	}
@@ -416,6 +418,7 @@ func (c *consensusRuntime) FSM() error {
 		"epoch", epoch.Number,
 		"endOfEpoch", isEndOfEpoch,
 		"endOfSprint", isEndOfSprint,
+		"withCommitment", ff.proposerCommitmentToRegister != nil,
 	)
 
 	c.lock.Lock()

@@ -213,6 +213,7 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 // applyBridgeCommitmentTx builds state transaction which contains data for bridge commitment registration
 func (f *fsm) applyBridgeCommitmentTx() error {
 	if f.proposerCommitmentToRegister != nil {
+		f.logger.Debug("Adding bridge commitment TX...")
 		bridgeCommitmentTx, err := f.createBridgeCommitmentTx()
 		if err != nil {
 			return fmt.Errorf("creation of bridge commitment transaction failed: %w", err)

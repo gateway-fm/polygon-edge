@@ -114,7 +114,7 @@ func run(cmd *cobra.Command, _ []string) {
 		return
 	}
 
-	rootTxRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(ep.rootJSONRPCAddr))
+	rootTxRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(ep.rootJSONRPCAddr), txrelayer.EnableNonceMap())
 	if err != nil {
 		outputter.SetError(fmt.Errorf("could not create root chain tx relayer: %w", err))
 

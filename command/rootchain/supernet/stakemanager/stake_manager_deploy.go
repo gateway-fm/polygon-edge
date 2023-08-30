@@ -3,6 +3,10 @@ package stakemanager
 import (
 	"fmt"
 
+	"github.com/spf13/cobra"
+	"github.com/umbracle/ethgo"
+	"golang.org/x/sync/errgroup"
+
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/command"
 	"github.com/0xPolygon/polygon-edge/command/helper"
@@ -13,9 +17,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi/artifact"
 	"github.com/0xPolygon/polygon-edge/txrelayer"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/spf13/cobra"
-	"github.com/umbracle/ethgo"
-	"golang.org/x/sync/errgroup"
 )
 
 var params stakeManagerDeployParams
@@ -113,7 +114,7 @@ func runCommand(cmd *cobra.Command, _ []string) error {
 		return fmt.Errorf("failed to get deployer key: %w", err)
 	}
 
-	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(params.jsonRPC))
+	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithIPAddress(params.jsonRPC), txrelayer.EnableNonceMap())
 	if err != nil {
 		return fmt.Errorf("deploying stake manager failed: %w", err)
 	}

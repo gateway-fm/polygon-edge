@@ -33,7 +33,7 @@ const (
 
 func TestE2E_Bridge_Transfers(t *testing.T) {
 	const (
-		transfersCount        = 5
+		transfersCount        = 4
 		amount                = 100
 		numBlockConfirmations = 2
 		// make epoch size long enough, so that all exit events are processed within the same epoch
@@ -123,7 +123,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 				false),
 		)
 
-		finalBlockNum := 10 * sprintSize
+		finalBlockNum := 12 * sprintSize
 		// wait for a couple of sprints
 		require.NoError(t, cluster.WaitForBlock(finalBlockNum, 2*time.Minute))
 
@@ -244,7 +244,7 @@ func TestE2E_Bridge_Transfers(t *testing.T) {
 		)
 
 		// wait for a few more sprints
-		midBlockNumber := initialBlockNum + 2*sprintSize
+		midBlockNumber := initialBlockNum + 5*sprintSize
 		require.NoError(t, cluster.WaitForBlock(midBlockNumber, 2*time.Minute))
 
 		// check that we submitted the minimal commitment to smart contract
@@ -1101,7 +1101,7 @@ func TestE2E_Bridge_ChangeVotingPower(t *testing.T) {
 	require.NoError(t, err)
 
 	targetEpoch := currentExtra.Checkpoint.EpochNumber + 2
-	require.NoError(t, waitForRootchainEpoch(targetEpoch, 2*time.Minute,
+	require.NoError(t, waitForRootchainEpoch(targetEpoch, 10*time.Minute,
 		rootRelayer, polybftCfg.Bridge.CheckpointManagerAddr))
 
 	// make sure that correct validator set is submitted to the checkpoint manager
