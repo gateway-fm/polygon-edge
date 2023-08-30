@@ -67,23 +67,15 @@ func (v *validatorsSnapshotCache) GetSnapshot(
 		return nil, err
 	}
 
-	epochToGetSnapshot := extra.Checkpoint.EpochNumber
-
-	epochEndingBlock := true
-	if blockNumber == forkBlock {
-		// at the fork point so we know we're not ending an epoch here and we need to increase the epoch number so we
-		// store the correct snapshot for validation further down the line
-		epochEndingBlock = true
-	} else {
-		epochEndingBlock, err = isEpochEndingBlock(blockNumber, extra, v.blockchain)
-		if err != nil && !errors.Is(err, blockchain.ErrNoBlock) {
-			// if there is no block after given block, we assume its not epoch ending block
-			// but, it's a regular use case, and we should not stop the snapshot calculation
-			// because there are cases we need the snapshot for the latest block in chain
-			return nil, err
-		}
+	epochEndingBlock, err := isEpochEndingBlock(blockNumber, extra, v.blockchain)
+	if err != nil && !errors.Is(err, blockchain.ErrNoBlock) {
+		// if there is no block after given block, we assume its not epoch ending block
+		// but, it's a regular use case, and we should not stop the snapshot calculation
+		// because there are cases we need the snapshot for the latest block in chain
+		return nil, err
 	}
 
+	epochToGetSnapshot := extra.Checkpoint.EpochNumber
 	if !epochEndingBlock {
 		epochToGetSnapshot--
 	}
@@ -114,13 +106,13 @@ func (v *validatorsSnapshotCache) GetSnapshot(
 		}
 
 		// now handle fork concerns related to the magic block being the first block of epoch 2, not epoch 1
-		if forkBlock == blockNumber {
-			genesisBlockSnapshot.Epoch = 2
-			err = v.storeSnapshot(genesisBlockSnapshot)
-			if err != nil {
-				return nil, fmt.Errorf("failed to handle forked magic block snapshot: %w", err)
-			}
-		}
+		//if forkBlock == blockNumber {
+		//	genesisBlockSnapshot.Epoch = 1
+		//	err = v.storeSnapshot(genesisBlockSnapshot)
+		//	if err != nil {
+		//		return nil, fmt.Errorf("failed to handle forked magic block snapshot: %w", err)
+		//	}
+		//}
 
 		latestValidatorSnapshot = genesisBlockSnapshot
 
@@ -210,7 +202,6 @@ func (v *validatorsSnapshotCache) computeSnapshot(
 
 	if existingSnapshot == nil {
 		snapshot = validator.AccountSet{}
-		snapshotEpoch = 1
 	} else {
 		snapshot = existingSnapshot.Snapshot
 		snapshotEpoch = existingSnapshot.Epoch + 1
