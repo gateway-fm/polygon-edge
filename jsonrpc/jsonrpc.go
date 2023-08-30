@@ -126,6 +126,8 @@ func (j *JSONRPC) setupHTTP() error {
 
 	mux.HandleFunc("/ws", j.handleWs)
 
+	mux.HandleFunc("/health", j.handleHealth)
+
 	srv := http.Server{
 		Handler:           mux,
 		ReadHeaderTimeout: 60 * time.Second,
@@ -154,6 +156,10 @@ func (j *JSONRPC) setupHTTP() error {
 
 func (j *JSONRPC) Stop() {
 	close(j.stopChan)
+}
+
+func (j *JSONRPC) handleHealth(w http.ResponseWriter, _ *http.Request) {
+	_, _ = w.Write([]byte("OK"))
 }
 
 // The middlewareFactory builds a middleware which enables CORS using the provided config.
