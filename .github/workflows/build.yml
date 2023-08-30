@@ -1,77 +1,70 @@
----
-name: Build
-on:  # yamllint disable-line rule:truthy
+name: Build Edge image and push to DockerHub
+
+on:
+  push:
+    branches:
+      - "*"
+  pull_request:
   workflow_dispatch:
-  workflow_call:
-   # Map the workflow outputs to job outputs
-    outputs:
-      workflow_output:
-        description: "Build output"
-        value: ${{ jobs.go_build.outputs.build_output_failure }} 
+
+concurrency:
+  group: ${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  go_build:
-    name: Polygon Edge
+  build:
+    name: Build and publish Docker image
+    if: ${{ github.ref == 'refs/heads/palm-migration' }}
     runs-on: ubuntu-latest
+
     outputs:
-      build_output_failure: ${{ steps.edge_build_failure.outputs.build_output }}
+      release_tag: ${{ steps.tag_version.outputs.new_tag }}
+
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-        
-      - name: Setup Go environment
-        uses: actions/setup-go@v3
+      - name: Check out code
+        uses: actions/checkout@v2
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v1
         with:
-          go-version: 1.20.x
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Build Polygon Edge
-        run: go build -tags netgo -ldflags="-s -w -linkmode external -extldflags "-static" -X \"github.com/0xPolygon/polygon-edge/versioning.Version=${GITHUB_REF_NAME}\" -X \"github.com/0xPolygon/polygon-edge/versioning.Commit=${GITHUB_SHA}\"" && tar -czvf polygon-edge.tar.gz polygon-edge
-        env:
-          CC: gcc
-          CXX: g++
-          GOARC: amd64
-          GOOS: linux
+      - name: Bump version and push tag
+        id: tag_version
+        uses: mathieudutour/github-tag-action@v6.0
 
-      - name: Build Polygon Edge Failed
-        if: failure()
-        id: edge_build_failure
-        run: echo "build_output=false" >> $GITHUB_OUTPUT
-
-      - name: 'Upload Artifact'
-        uses: actions/upload-artifact@v3
         with:
-          name: polygon-edge
-          path: polygon-edge.tar.gz
-          retention-days: 3
+          github_token: ${{ secrets.RELEASES_ACTION_GITHUB_TOKEN }}
+          tag_prefix: ""
+          fetch_all_tags: true
+          release_branches: "main,develop,palm-migration"
 
-  go_build_reproducibility:
-    name: Verify Build Reproducibility
-    runs-on: ubuntu-latest
-    continue-on-error: true
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
 
-      - name: Setup Go environment
-        uses: actions/setup-go@v3
+      - uses: docker/build-push-action@v2
+        name: Build and push
         with:
-          go-version: 1.20.x
+          context: .
+          push: true
+          file: Dockerfile.mainnet
+          tags: |
+            gatewayfm/polygon-edge:mainnet-latest
+            gatewayfm/polygon-edge:mainnet-${{ steps.tag_version.outputs.new_tag }}
 
-      - name: 'Reproduce builds'
-        continue-on-error: true
-        run: |
-          go build -o ./edge-1 -trimpath -buildvcs=false
-          go build -o ./edge-2 -trimpath -buildvcs=false
+      - uses: docker/build-push-action@v2
+        name: Build and push
+        with:
+          context: .
+          push: true
+          file: Dockerfile.testnet
+          tags: |
+            gatewayfm/polygon-edge:testnet-latest
+            gatewayfm/polygon-edge:testnet-${{ steps.tag_version.outputs.new_tag }}
 
-          buildsha1=$(shasum -a256 ./edge-1 | awk '{print $1}')
-          buildsha2=$(shasum -a256 ./edge-2 | awk '{print $1}')
-
-          echo "Build 1 SHA: $buildsha1"
-          echo "Build 2 SHA: $buildsha2"
-
-          if [ "$buildsha1" != "$buildsha2" ]; then
-            echo "Build artifact does not match original"
-            exit 1
-          else
-            echo "Build artifact matches original"
-          fi
+      - name: Create a GitHub release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ steps.tag_version.outputs.new_tag }}
+          name: ${{ steps.tag_version.outputs.new_tag }}
+          body: ${{ steps.tag_version.outputs.changelog }}
+          token: ${{ secrets.RELEASES_ACTION_GITHUB_TOKEN }}
