@@ -479,7 +479,8 @@ func (e *Eth) Call(arg *txnArgs, filter BlockNumberOrHash, apiOverride *stateOve
 		return nil, err
 	}
 	// If the caller didn't supply the gas limit in the message, then we set it to maximum possible => block gas limit
-	if transaction.Gas == 0 {
+	// if the gas is higher than the maximum gas limit, then we set it to the maximum gas limit
+	if transaction.Gas == 0 || transaction.Gas > header.GasLimit {
 		transaction.Gas = header.GasLimit
 	}
 
