@@ -106,13 +106,13 @@ func (v *validatorsSnapshotCache) GetSnapshot(
 		}
 
 		// now handle fork concerns related to the magic block being the first block of epoch 2, not epoch 1
-		//if forkBlock == blockNumber {
-		//	genesisBlockSnapshot.Epoch = 1
-		//	err = v.storeSnapshot(genesisBlockSnapshot)
-		//	if err != nil {
-		//		return nil, fmt.Errorf("failed to handle forked magic block snapshot: %w", err)
-		//	}
-		//}
+		if forkBlock > 0 && forkBlock == blockNumber {
+			genesisBlockSnapshot.Epoch = 1
+			err = v.storeSnapshot(genesisBlockSnapshot)
+			if err != nil {
+				return nil, fmt.Errorf("failed to handle forked magic block snapshot: %w", err)
+			}
+		}
 
 		latestValidatorSnapshot = genesisBlockSnapshot
 
