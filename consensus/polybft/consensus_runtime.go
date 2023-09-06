@@ -83,6 +83,7 @@ type runtimeConfig struct {
 	fromForked            bool
 	forkBlock             uint64
 	isPalm                bool
+	isRelayer             bool
 }
 
 // consensusRuntime is a struct that provides consensus runtime features like epoch, state and event management
@@ -217,6 +218,7 @@ func (c *consensusRuntime) initCheckpointManager(logger hcf.Logger) error {
 			logger.Named("checkpoint_manager"),
 			c.state,
 			c.config.forkBlock,
+			c.config.isRelayer,
 		)
 	} else {
 		c.checkpointManager = &dummyCheckpointManager{}

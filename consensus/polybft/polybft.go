@@ -538,6 +538,7 @@ func (p *Polybft) initRuntime() error {
 		fromForked:            p.config.FromForked,
 		forkBlock:             p.config.Config.Params.ForkBlock,
 		isPalm:                p.config.Config.Params.IsPalm(),
+		isRelayer:             p.config.IsRelayer,
 	}
 
 	runtime, err := newConsensusRuntime(p.logger, runtimeConfig)

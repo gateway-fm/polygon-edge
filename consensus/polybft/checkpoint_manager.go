@@ -1,7 +1,6 @@
 package polybft
 
 import (
-	"bytes"
 	"fmt"
 	"math/big"
 	"sort"
@@ -73,13 +72,15 @@ type checkpointManager struct {
 	eventGetter *eventsGetter[*ExitEvent]
 	// holds a block number at which the latest fork happened for switching consensus
 	forkBlock uint64
+	// determines if this node should send checkpoints or not to the rootchain
+	isRelayer bool
 }
 
 // newCheckpointManager creates a new instance of checkpointManager
 func newCheckpointManager(key ethgo.Key, checkpointOffset uint64,
 	checkpointManagerSC types.Address, txRelayer txrelayer.TxRelayer,
 	blockchain blockchainBackend, backend polybftBackend, logger hclog.Logger,
-	state *State, forkBlock uint64) *checkpointManager {
+	state *State, forkBlock uint64, isRelayer bool) *checkpointManager {
 	retry := &eventsGetter[*ExitEvent]{
 		blockchain: blockchain,
 		isValidLogFn: func(l *types.Log) bool {
@@ -99,6 +100,7 @@ func newCheckpointManager(key ethgo.Key, checkpointOffset uint64,
 		state:                 state,
 		eventGetter:           retry,
 		forkBlock:             forkBlock,
+		isRelayer:             isRelayer,
 	}
 }
 
@@ -302,6 +304,10 @@ func (c *checkpointManager) isCheckpointBlock(_ uint64, isEpochEndingBlock bool)
 // PostBlock is called on every insert of finalized block (either from consensus or syncer)
 // It will read any exit event that happened in block and insert it to state boltDb
 func (c *checkpointManager) PostBlock(req *PostBlockRequest) error {
+	if !c.isRelayer {
+		return nil
+	}
+
 	block := req.FullBlock.Block.Number()
 
 	lastBlock, err := c.state.CheckpointStore.getLastSaved()
@@ -337,9 +343,8 @@ func (c *checkpointManager) PostBlock(req *PostBlockRequest) error {
 	}
 
 	isCheckpoint := c.isCheckpointBlock(req.FullBlock.Block.Header.Number, req.IsEpochEndingBlock)
-	isActiveMiner := bytes.Equal(c.key.Address().Bytes(), req.FullBlock.Block.Header.Miner)
 
-	if isCheckpoint && isActiveMiner {
+	if isCheckpoint {
 		c.logger.Info("sending checkpoint to rootchain")
 		go func(header *types.Header, epochNumber uint64) {
 			if err := c.submitCheckpoint(header, req.IsEpochEndingBlock); err != nil {

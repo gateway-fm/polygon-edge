@@ -684,6 +684,7 @@ func (s *Server) setupConsensus(
 			BlockTime:             uint64(blockTime.Seconds()),
 			NumBlockConfirmations: s.config.NumBlockConfirmations,
 			FromForked:            fromForked,
+			IsRelayer:             s.isRelayer,
 		},
 	)
 
