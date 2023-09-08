@@ -74,6 +74,7 @@ type TraceConfig struct {
 	DisableStorage   bool    `json:"disableStorage"`
 	EnableReturnData bool    `json:"enableReturnData"`
 	Timeout          *string `json:"timeout"`
+	Legacy           bool    `json:"legacy"`
 }
 
 var debugTimeoutDefault = "5s"
@@ -84,6 +85,7 @@ var defaultTraceConfig = &TraceConfig{
 	DisableStorage:   true,
 	EnableReturnData: false,
 	Timeout:          &debugTimeoutDefault,
+	Legacy:           true,
 }
 
 func (d *Debug) TraceBlockByNumber(
@@ -256,6 +258,7 @@ func newTracer(config *TraceConfig) (
 		EnableStack:      !config.DisableStack,
 		EnableStorage:    !config.DisableStorage,
 		EnableReturnData: config.EnableReturnData,
+		Legacy:           config.Legacy,
 	})
 
 	timeoutCtx, cancel := context.WithTimeout(context.Background(), timeout)

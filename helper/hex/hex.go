@@ -86,7 +86,7 @@ func EncodeBig(bigint *big.Int) string {
 	return fmt.Sprintf("%#x", bigint)
 }
 
-func EncodeBigLegacy(bigint *big.Int) string {
+func EncodeBigLongFormat(bigint *big.Int) string {
 	if bigint.BitLen() == 0 {
 		return "0000000000000000000000000000000000000000000000000000000000000000"
 	}

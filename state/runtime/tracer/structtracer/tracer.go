@@ -398,10 +398,10 @@ type StructLogRes struct {
 	Gas           uint64            `json:"gas"`
 	GasCost       uint64            `json:"gasCost"`
 	Depth         int               `json:"depth"`
-	Error         string            `json:"error,omitempty"`
-	Stack         []string          `json:"stack"`
-	Memory        []string          `json:"memory"`
-	Storage       map[string]string `json:"storage"`
+	Error         string            `json:"error"`
+	Stack         []string          `json:"stack,omitempty"`
+	Memory        []string          `json:"memory,omitempty"`
+	Storage       map[string]string `json:"storage,omitempty"`
 	RefundCounter uint64            `json:"refund,omitempty"`
 	Reason        *string           `json:"reason"`
 }
@@ -572,14 +572,18 @@ func structLogToRes(l StructLog, config Config) StructLogRes {
 	}
 
 	toAppend.Stack = make([]string, len(l.Stack))
-
-	for i, value := range l.Stack {
-		toAppend.Stack[i] = hex.EncodeBigLegacy(value)
+	if config.EnableStack {
+		for i, value := range l.Stack {
+			if config.Legacy {
+				toAppend.Stack[i] = hex.EncodeBigLongFormat(value)
+			} else {
+				toAppend.Stack[i] = hex.EncodeBig(value)
+			}
+		}
 	}
 
 	toAppend.Memory = make([]string, 0, (len(l.Memory)+31)/32)
-
-	if l.Memory != nil {
+	if config.EnableMemory && l.Memory != nil {
 		for i := 0; i+32 <= len(l.Memory); i += 32 {
 			toAppend.Memory = append(
 				toAppend.Memory,
@@ -589,9 +593,10 @@ func structLogToRes(l StructLog, config Config) StructLogRes {
 	}
 
 	toAppend.Storage = make(map[string]string)
-
-	for key, value := range l.Storage {
-		toAppend.Storage[hex.EncodeToString(key.Bytes())] = hex.EncodeToString(value.Bytes())
+	if config.EnableStorage {
+		for key, value := range l.Storage {
+			toAppend.Storage[hex.EncodeToString(key.Bytes())] = hex.EncodeToString(value.Bytes())
+		}
 	}
 
 	return toAppend
