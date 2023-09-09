@@ -44,6 +44,10 @@ type callFrame struct {
 	callFrames []*callFrame
 	logs       []StructLog
 	index      int
+	from       types.Address
+	to         types.Address
+	input      []byte
+	value      *big.Int
 }
 
 func (l *StructLog) ErrorString() string {
@@ -139,6 +143,10 @@ func (t *StructTracer) CallStart(
 		gas:        gas,
 		callFrames: []*callFrame{},
 		logs:       []StructLog{},
+		from:       from,
+		to:         to,
+		input:      input,
+		value:      value,
 	}
 
 	t.callStack = append(t.callStack, frame)
@@ -404,6 +412,10 @@ type StructLogRes struct {
 	Storage       map[string]string `json:"storage,omitempty"`
 	RefundCounter uint64            `json:"refund,omitempty"`
 	Reason        *string           `json:"reason"`
+	From          string            `json:"from,omitempty"`
+	To            string            `json:"to,omitempty"`
+	Input         string            `json:"input,omitempty"`
+	Value         string            `json:"value,omitempty"`
 }
 
 func (t *StructTracer) GetResult() (interface{}, error) {
@@ -528,6 +540,14 @@ func checkForCall(frame *callFrame, toAppend *StructLogRes) {
 		toAppend.Op == "CALLCODE" {
 		gas := calculateCallGas(frame, true)
 		toAppend.GasCost -= gas
+		toAppend.From = frame.from.String()
+		toAppend.To = frame.to.String()
+		toAppend.Input = "0x" + hex.EncodeToString(frame.input)
+		if frame.value != nil {
+			toAppend.Value = hex.EncodeBig(frame.value)
+		} else {
+			toAppend.Value = "0x0"
+		}
 	}
 }
 
