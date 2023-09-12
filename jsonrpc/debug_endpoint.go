@@ -8,6 +8,7 @@ import (
 
 	"github.com/0xPolygon/polygon-edge/helper/hex"
 	"github.com/0xPolygon/polygon-edge/state/runtime/tracer"
+	"github.com/0xPolygon/polygon-edge/state/runtime/tracer/calltracer"
 	"github.com/0xPolygon/polygon-edge/state/runtime/tracer/structtracer"
 	"github.com/0xPolygon/polygon-edge/types"
 )
@@ -75,6 +76,7 @@ type TraceConfig struct {
 	EnableReturnData bool    `json:"enableReturnData"`
 	Timeout          *string `json:"timeout"`
 	Legacy           bool    `json:"legacy"`
+	Tracer           string  `json:"tracer"`
 }
 
 var debugTimeoutDefault = "5s"
@@ -253,13 +255,19 @@ func newTracer(config *TraceConfig) (
 		}
 	}
 
-	tracer := structtracer.NewStructTracer(structtracer.Config{
-		EnableMemory:     config.EnableMemory,
-		EnableStack:      !config.DisableStack,
-		EnableStorage:    !config.DisableStorage,
-		EnableReturnData: config.EnableReturnData,
-		Legacy:           config.Legacy,
-	})
+	var tracer tracer.Tracer
+
+	if config.Tracer == "callTracer" {
+		tracer = calltracer.NewCallTracer()
+	} else {
+		tracer = structtracer.NewStructTracer(structtracer.Config{
+			EnableMemory:     config.EnableMemory,
+			EnableStack:      !config.DisableStack,
+			EnableStorage:    !config.DisableStorage,
+			EnableReturnData: config.EnableReturnData,
+			Legacy:           config.Legacy,
+		})
+	}
 
 	timeoutCtx, cancel := context.WithTimeout(context.Background(), timeout)
 
