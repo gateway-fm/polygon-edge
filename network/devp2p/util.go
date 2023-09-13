@@ -89,7 +89,7 @@ func GethTransactionConvert(t *gethTypes.Transaction) *types.Transaction {
 		S:         s,
 		Hash:      GethHashConvert(t.Hash()),
 		Type:      GethTxTypeConvert(t.Type()),
-		ChainId:   t.ChainId(),
+		ChainID:   t.ChainId(),
 	}
 
 	for _, at := range t.AccessList() {

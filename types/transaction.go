@@ -28,7 +28,7 @@ func txTypeFromByte(b byte) (TxType, error) {
 	tt := TxType(b)
 
 	switch tt {
-	case LegacyTx, StateTx, DynamicFeeTx:
+	case LegacyTx, StateTx, DynamicFeeTx, AccessListTx:
 		return tt, nil
 	default:
 		return tt, fmt.Errorf("unknown transaction type: %d", b)
@@ -70,7 +70,6 @@ type Transaction struct {
 	size atomic.Pointer[uint64]
 
 	AccessList []AccessTuple
-	ChainId    *big.Int
 }
 
 type AccessTuple struct {

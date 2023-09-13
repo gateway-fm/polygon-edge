@@ -35,7 +35,6 @@ type transaction struct {
 	TxIndex     *argUint64     `json:"transactionIndex"`
 	ChainID     *argBig        `json:"chainID,omitempty"`
 	Type        argUint64      `json:"type"`
-	ChainId     argUint64      `json:"chainId"`
 }
 
 func (t transaction) getHash() types.Hash { return t.Hash }

@@ -272,14 +272,12 @@ func (e *Eth) GetTransactionByHash(hash types.Hash) (interface{}, error) {
 
 		// Find the transaction within the block
 		if txn, idx := types.FindTxByHash(b.Transactions, hash); txn != nil {
-			tx := toTransaction(
+			return toTransaction(
 				txn,
 				argUintPtr(b.Number()),
 				argHashPtr(b.Hash()),
 				&idx,
 			)
-			tx.ChainId = argUint64(e.chainID)
-			return tx
 		}
 
 		return nil

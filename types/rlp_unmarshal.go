@@ -409,6 +409,8 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 		num = 10
 	case DynamicFeeTx:
 		num = 12
+	case AccessListTx:
+		num = 11
 	default:
 		return fmt.Errorf("transaction type %d not found", t.Type)
 	}
@@ -418,7 +420,7 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 	}
 
 	// Load Chain ID for dynamic transactions
-	if t.Type == DynamicFeeTx {
+	if t.Type == DynamicFeeTx || t.Type == AccessListTx {
 		t.ChainID = new(big.Int)
 		if err = getElem().GetBigInt(t.ChainID); err != nil {
 			return err
@@ -476,10 +478,17 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 		return err
 	}
 
-	// Skipping Access List field since we don't support it.
-	// This is needed to be compatible with other EVM chains and have the same format.
-	// Since we don't have access list, just skip it here.
-	if t.Type == DynamicFeeTx {
+	if t.Type == AccessListTx {
+		al := getElem()
+		list, err := RlpDecodeAccessList(al)
+		if err != nil {
+			return err
+		}
+		t.AccessList = list
+	} else if t.Type == DynamicFeeTx {
+		// Skipping Access List field since we don't support it.
+		// This is needed to be compatible with other EVM chains and have the same format.
+		// Since we don't have access list, just skip it here.
 		_ = getElem()
 	}
 
@@ -513,4 +522,51 @@ func (t *Transaction) unmarshalRLPFrom(p *fastrlp.Parser, v *fastrlp.Value) erro
 	}
 
 	return nil
+}
+
+func RlpDecodeAccessList(vv *fastrlp.Value) ([]AccessTuple, error) {
+	if vv == nil {
+		return []AccessTuple{}, nil
+	}
+
+	details, err := vv.GetElems()
+	if err != nil {
+		return []AccessTuple{}, err
+	}
+	if len(details) == 0 {
+		return []AccessTuple{}, nil
+	}
+
+	accessList := make([]AccessTuple, len(details))
+
+	for idx, at := range details {
+		topList, err := at.GetElems()
+		if err != nil {
+			return nil, err
+		}
+		if len(topList) != 2 {
+			return nil, fmt.Errorf("invalid access list")
+		}
+
+		addrBytes, err := topList[0].Bytes()
+		if err != nil {
+			return nil, err
+		}
+		addr := BytesToAddress(addrBytes)
+		sKeys := topList[1]
+		keys := make([]Hash, sKeys.Elems())
+		for j := 0; j < sKeys.Elems(); j++ {
+			keyBytes, err := sKeys.Get(j).Bytes()
+			if err != nil {
+				return nil, err
+			}
+			copy(keys[j][:], keyBytes)
+		}
+		accessList[idx] = AccessTuple{
+			Address:     &addr,
+			StorageKeys: keys,
+		}
+	}
+
+	return accessList, nil
 }

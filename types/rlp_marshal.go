@@ -195,7 +195,7 @@ func (t *Transaction) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 	vv := arena.NewArray()
 
 	if t.Type == AccessListTx {
-		vv.Set(arena.NewBigInt(t.ChainId))
+		vv.Set(arena.NewBigInt(t.ChainID))
 		vv.Set(arena.NewUint(t.Nonce))
 		vv.Set(arena.NewBigInt(t.GasPrice))
 		vv.Set(arena.NewUint(t.Gas))
@@ -270,7 +270,7 @@ func (t *Transaction) MarshalRLPWith(arena *fastrlp.Arena) *fastrlp.Value {
 // RlpEncodeAccessList encodes an access list into the passed RLP value.
 func RlpEncodeAccessList(arena *fastrlp.Arena, vv *fastrlp.Value, list []AccessTuple) {
 	if len(list) == 0 {
-		vv.Set(arena.NewNullArray())
+		vv.Set(arena.NewArray())
 	} else {
 		ar1 := arena.NewArray()
 		for _, at := range list {
@@ -282,6 +282,7 @@ func RlpEncodeAccessList(arena *fastrlp.Arena, vv *fastrlp.Value, list []AccessT
 				ar3.Set(arena.NewCopyBytes(sk.Bytes()))
 			}
 			ar2.Set(ar3)
+			ar1.Set(ar2)
 		}
 		vv.Set(ar1)
 	}
