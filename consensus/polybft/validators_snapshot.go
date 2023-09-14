@@ -74,6 +74,9 @@ func (v *validatorsSnapshotCache) GetSnapshot(
 		// because there are cases we need the snapshot for the latest block in chain
 		return nil, err
 	}
+	if blockNumber == forkBlock {
+		epochEndingBlock = false
+	}
 
 	epochToGetSnapshot := extra.Checkpoint.EpochNumber
 	if !epochEndingBlock {
@@ -103,15 +106,6 @@ func (v *validatorsSnapshotCache) GetSnapshot(
 		err = v.storeSnapshot(genesisBlockSnapshot)
 		if err != nil {
 			return nil, fmt.Errorf("failed to store validators snapshot for epoch 0: %w", err)
-		}
-
-		// now handle fork concerns related to the magic block being the first block of epoch 2, not epoch 1
-		if forkBlock > 0 && forkBlock == blockNumber {
-			genesisBlockSnapshot.Epoch = 1
-			err = v.storeSnapshot(genesisBlockSnapshot)
-			if err != nil {
-				return nil, fmt.Errorf("failed to handle forked magic block snapshot: %w", err)
-			}
 		}
 
 		latestValidatorSnapshot = genesisBlockSnapshot
