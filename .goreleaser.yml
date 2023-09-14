@@ -7,6 +7,7 @@ release:
 
 builds:
   - id: darwin-amd64
+    gobinary: "go1.20"
     main: ./main.go
     binary: polygon-edge
     goos:
@@ -20,6 +21,7 @@ builds:
       -s -w -X 'github.com/0xPolygon/polygon-edge/versioning.Version=v{{ .Version }}'
 
   - id: darwin-arm64
+    gobinary: "go1.20"
     main: ./main.go
     binary: polygon-edge
     goos:
@@ -33,6 +35,7 @@ builds:
       -s -w -X 'github.com/0xPolygon/polygon-edge/versioning.Version=v{{ .Version }}'
 
   - id: linux-amd64
+    gobinary: "go1.20"
     main: ./main.go
     binary: polygon-edge
     goos:
@@ -50,6 +53,7 @@ builds:
       - osusergo
 
   - id: linux-arm64
+    gobinary: "go1.20"
     main: ./main.go
     binary: polygon-edge
     goos:
