@@ -13,10 +13,11 @@ import (
 	bls "github.com/0xPolygon/polygon-edge/consensus/polybft/signer"
 	"github.com/0xPolygon/polygon-edge/crypto"
 
-	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
-	"github.com/0xPolygon/polygon-edge/types"
 	"github.com/umbracle/ethgo/abi"
 	"github.com/umbracle/fastrlp"
+
+	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
+	"github.com/0xPolygon/polygon-edge/types"
 )
 
 var accountSetABIType = abi.MustNewType(`tuple(tuple(address _address, uint256[4] blsKey, uint256 votingPower)[])`)
@@ -318,11 +319,9 @@ func (as AccountSet) ApplyDelta(validatorsDelta *ValidatorSetDelta) (AccountSet,
 
 	// Append added validators
 	for _, addedValidator := range validatorsDelta.Added {
-		if validators.ContainsAddress(addedValidator.Address) {
-			return nil, fmt.Errorf("validator %v is already present in the validators snapshot", addedValidator.Address.String())
+		if !validators.ContainsAddress(addedValidator.Address) {
+			validators = append(validators, addedValidator)
 		}
-
-		validators = append(validators, addedValidator)
 	}
 
 	// Handle updated validators (find them in the validators slice and insert to appropriate index)
