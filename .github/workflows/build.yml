@@ -84,6 +84,8 @@ jobs:
     name: Build and publish binaries
     if: ${{ github.ref == 'refs/heads/palm-migration' }}
     runs-on: ubuntu-latest
+    env:
+      DOCKER_CONFIG: $HOME/.docker
 
     steps:
       - uses: actions/checkout@v3
@@ -93,15 +95,29 @@ jobs:
 
       - uses: actions/setup-go@v4
         with:
-          go-version: '1.20'
+          go-version: '1.20.x'
 
-      # More assembly might be required: Docker logins, GPG, etc. It all depends
-      # on your needs.
-      - uses: goreleaser/goreleaser-action@v4
-        with:
-          # either 'goreleaser' (default) or 'goreleaser-pro':
-          distribution: goreleaser
-          version: latest
-          args: release --clean
+      - name: Prepare
+        id: prepare
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          echo tag_name=${TAG} >> $GITHUB_OUTPUT
+
+      - name: Run GoReleaser
+        run: |
+          docker run \
+          		--rm \
+          		--privileged \
+          		-e CGO_ENABLED=1 \
+          		-e GITHUB_TOKEN \
+                -e DOCKER_CONFIG \
+          		-v /var/run/docker.sock:/var/run/docker.sock \
+          		-v `pwd`:/go/src/$(PACKAGE_NAME) \
+          		-w /go/src/$(PACKAGE_NAME) \
+          		ghcr.io/goreleaser/goreleaser-cross:${GOLANG_CROSS_VERSION} \
+          		--rm-dist --skip-validate
         env:
+          PACKAGE_NAME: github.com/gateway-fm/polygon-edge
+          GOLANG_CROSS_VERSION: v1.20.5
           GITHUB_TOKEN: ${{ secrets.RELEASES_ACTION_GITHUB_TOKEN }}
+          VERSION: ${{ steps.prepare.outputs.tag_name }}
