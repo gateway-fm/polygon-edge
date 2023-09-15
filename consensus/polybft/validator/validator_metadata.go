@@ -319,9 +319,11 @@ func (as AccountSet) ApplyDelta(validatorsDelta *ValidatorSetDelta) (AccountSet,
 
 	// Append added validators
 	for _, addedValidator := range validatorsDelta.Added {
-		if !validators.ContainsAddress(addedValidator.Address) {
-			validators = append(validators, addedValidator)
+		if validators.ContainsAddress(addedValidator.Address) {
+			return nil, fmt.Errorf("validator %v is already present in the validators snapshot", addedValidator.Address.String())
 		}
+
+		validators = append(validators, addedValidator)
 	}
 
 	// Handle updated validators (find them in the validators slice and insert to appropriate index)
