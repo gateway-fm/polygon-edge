@@ -1,7 +1,6 @@
 peers.json
 genesis.json
 genesis-mainnet.json
-genesis-testnet.json
 genesis-polygon.json
 manifest.json
 secretsManagerConfig.json
