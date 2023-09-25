@@ -282,7 +282,7 @@ func TestCheckpointManager_IsCheckpointBlock(t *testing.T) {
 		t.Run(c.name, func(t *testing.T) {
 			t.Parallel()
 
-			checkpointMgr := newCheckpointManager(wallet.NewEcdsaSigner(createTestKey(t)), c.checkpointsOffset, types.ZeroAddress, nil, nil, nil, hclog.NewNullLogger(), nil, 0)
+			checkpointMgr := newCheckpointManager(wallet.NewEcdsaSigner(createTestKey(t)), c.checkpointsOffset, types.ZeroAddress, nil, nil, nil, hclog.NewNullLogger(), nil, 0, false)
 			require.Equal(t, c.isCheckpointBlock, checkpointMgr.isCheckpointBlock(c.blockNumber, c.isEpochEndingBlock))
 		})
 	}
@@ -322,7 +322,7 @@ func TestCheckpointManager_PostBlock(t *testing.T) {
 
 	blockchain := new(blockchainMock)
 	checkpointManager := newCheckpointManager(wallet.NewEcdsaSigner(createTestKey(t)), 5, types.ZeroAddress,
-		nil, blockchain, nil, hclog.NewNullLogger(), state, 0)
+		nil, blockchain, nil, hclog.NewNullLogger(), state, 0, true)
 
 	t.Run("PostBlock - not epoch ending block", func(t *testing.T) {
 		require.NoError(t, state.CheckpointStore.updateLastSaved(block-1)) // we got everything till the current block
@@ -483,7 +483,8 @@ func TestCheckpointManager_GenerateExitProof(t *testing.T) {
 		nil,
 		hclog.NewNullLogger(),
 		state,
-		0)
+		0,
+		false)
 
 	exitEvents := insertTestExitEvents(t, state, 1, numOfBlocks, numOfEventsPerBlock)
 	encodedEvents := encodeExitEvents(t, exitEvents)

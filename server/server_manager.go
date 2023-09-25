@@ -3,9 +3,11 @@ package server
 import (
 	"fmt"
 	"net/http"
+	"path"
 	"path/filepath"
 
 	"github.com/hashicorp/go-hclog"
+	bolt "go.etcd.io/bbolt"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/blockchain/storage"
@@ -21,6 +23,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/secrets"
 	"github.com/0xPolygon/polygon-edge/state"
 	itrie "github.com/0xPolygon/polygon-edge/state/immutable-trie"
+	"github.com/0xPolygon/polygon-edge/txpool"
 	"github.com/0xPolygon/polygon-edge/types"
 )
 
@@ -45,6 +48,7 @@ type Manager struct {
 	nextFork             *uint64
 	currentHeader        *types.Header
 	storeContainer       *jsonrpc.StoreContainer
+	txpoolStorage        *txpool.StorageImpl
 }
 
 func NewManager(cfg *Config) (*Manager, error) {
@@ -100,6 +104,18 @@ func NewManager(cfg *Config) (*Manager, error) {
 	}
 	m.db = db
 	m.storeContainer = jsonrpc.NewStoreContainer(db)
+
+	// setup the txpool db
+	txpoolDb, err := bolt.Open(path.Join(cfg.DataDir, "/txpool.db"), 0600, nil)
+	if err != nil {
+		return nil, err
+	}
+	txpoolStorage := txpool.NewStorage(txpoolDb)
+	err = txpoolStorage.Setup()
+	if err != nil {
+		return nil, err
+	}
+	m.txpoolStorage = txpoolStorage
 
 	// setup secrets
 	secretsManager, err := setupSecretsManager(cfg, m.logger)
@@ -169,6 +185,7 @@ func (m *Manager) createServer(
 		m.storeContainer,
 		isRelayer,
 		txHandoff,
+		m.txpoolStorage,
 	)
 }
 

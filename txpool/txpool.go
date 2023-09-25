@@ -1,11 +1,19 @@
 package txpool
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"math/big"
+	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/armon/go-metrics"
+	"github.com/golang/protobuf/ptypes/any"
+	"github.com/hashicorp/go-hclog"
+	"github.com/libp2p/go-libp2p/core/peer"
+	"google.golang.org/grpc"
 
 	"github.com/0xPolygon/polygon-edge/blockchain"
 	"github.com/0xPolygon/polygon-edge/chain"
@@ -15,11 +23,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/state/runtime"
 	"github.com/0xPolygon/polygon-edge/txpool/proto"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/armon/go-metrics"
-	"github.com/golang/protobuf/ptypes/any"
-	"github.com/hashicorp/go-hclog"
-	"github.com/libp2p/go-libp2p/core/peer"
-	"google.golang.org/grpc"
 )
 
 const (
@@ -84,6 +87,10 @@ func (o txOrigin) String() (s string) {
 	return
 }
 
+var (
+	dbKey = []byte("tx-rlp")
+)
+
 // store interface defines State helper methods the TxPool should have access to
 type store interface {
 	Header() *types.Header
@@ -96,11 +103,17 @@ type signer interface {
 	Sender(tx *types.Transaction) (types.Address, error)
 }
 
+type Storage interface {
+	Get([]byte) ([]byte, error)
+	Put([]byte, []byte) error
+}
+
 type Config struct {
 	PriceLimit         uint64
 	MaxSlots           uint64
 	MaxAccountEnqueued uint64
 	ChainID            *big.Int
+	DataDir            string
 }
 
 /* All requests are passed to the main loop
@@ -193,6 +206,11 @@ type TxPool struct {
 
 	// chain id
 	chainID *big.Int
+
+	// db is used to persist the txpool state when it is changed so that on init the state
+	// can be restored
+	db    Storage
+	dbMtx *sync.Mutex
 }
 
 // NewTxPool returns a new pool for processing incoming transactions.
@@ -203,9 +221,12 @@ func NewTxPool(
 	grpcServer *grpc.Server,
 	network *network.Server,
 	config *Config,
+	db Storage,
 ) (*TxPool, error) {
+	log := logger.Named("txpool")
+
 	pool := &TxPool{
-		logger:      logger.Named("txpool"),
+		logger:      log,
 		forks:       forks,
 		store:       store,
 		executables: newPricesQueue(0, nil),
@@ -219,6 +240,8 @@ func NewTxPool(
 		promoteReqCh: make(chan promoteRequest),
 		pruneCh:      make(chan struct{}),
 		shutdownCh:   make(chan struct{}),
+		db:           db,
+		dbMtx:        &sync.Mutex{},
 	}
 
 	// Attach the event manager
@@ -256,6 +279,12 @@ func (p *TxPool) updatePending(i int64) {
 func (p *TxPool) Start() {
 	// set default value of txpool pending transactions gauge
 	p.updatePending(0)
+
+	err := p.loadTransactionsFromStorage()
+	if err != nil {
+		// just log the error as this shouldn't stop the node from starting
+		p.logger.Error("failed to load transactions from storage", "err", err)
+	}
 
 	//	run the handler for high gauge level pruning
 	go func() {
@@ -306,7 +335,7 @@ func (p *TxPool) SetSealing(sealing bool) {
 // AddTx adds a new transaction to the pool (sent from json-RPC/gRPC endpoints)
 // and broadcasts it to the network (if enabled).
 func (p *TxPool) AddTx(tx *types.Transaction) error {
-	if err := p.addTx(local, tx); err != nil {
+	if err := p.addTx(local, tx, true); err != nil {
 		p.logger.Error("failed to add tx", "err", err)
 
 		return err
@@ -412,7 +441,7 @@ func (p *TxPool) Drop(tx *types.Transaction) {
 
 	// pool resource cleanup
 	clearAccountQueue := func(txs []*types.Transaction) {
-		p.index.remove(txs...)
+		p.removeFromIndex(txs...)
 		p.gauge.decrease(slotsRequired(txs...))
 
 		// increase counter
@@ -501,7 +530,7 @@ func (p *TxPool) processEvent(event *blockchain.Event) {
 		}
 
 		// remove mined txs from the lookup map
-		p.index.remove(block.Transactions...)
+		p.removeFromIndex(block.Transactions...)
 
 		// Extract latest nonces
 		for _, tx := range block.Transactions {
@@ -733,7 +762,7 @@ func (p *TxPool) pruneAccountsWithNonceHoles() {
 			removed := account.enqueued.clear()
 
 			account.nonceToTx.remove(removed...)
-			p.index.remove(removed...)
+			p.removeFromIndex(removed...)
 			p.gauge.decrease(slotsRequired(removed...))
 
 			return true
@@ -745,7 +774,7 @@ func (p *TxPool) pruneAccountsWithNonceHoles() {
 // for all new transactions. If the call is
 // successful, an account is created for this address
 // (only once) and an enqueueRequest is signaled.
-func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
+func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction, persist bool) error {
 	if p.logger.IsDebug() {
 		p.logger.Debug("add tx", "origin", origin.String(), "hash", tx.Hash.String())
 	}
@@ -821,14 +850,14 @@ func (p *TxPool) addTx(origin txOrigin, tx *types.Transaction) error {
 	}
 
 	// add to index
-	if ok := p.index.add(tx); !ok {
+	if ok := p.addToIndex(tx, persist); !ok {
 		metrics.IncrCounter([]string{txPoolMetrics, "already_known_tx"}, 1)
 
 		return ErrAlreadyKnown
 	}
 
 	if oldTxWithSameNonce != nil {
-		p.index.remove(oldTxWithSameNonce)
+		p.removeFromIndex(oldTxWithSameNonce)
 		p.gauge.decrease(slotsRequired(oldTxWithSameNonce))
 	} else {
 		metrics.SetGauge([]string{txPoolMetrics, "added_tx"}, 1)
@@ -872,7 +901,7 @@ func (p *TxPool) handlePromoteRequest(req promoteRequest) {
 		p.logger.Debug("promote request", "promoted", promoted, "addr", addr.String())
 	}
 
-	p.index.remove(pruned...)
+	p.removeFromIndex(pruned...)
 	p.gauge.decrease(slotsRequired(pruned...))
 
 	// update metrics
@@ -912,7 +941,7 @@ func (p *TxPool) addGossipTx(obj interface{}, _ peer.ID) {
 	}
 
 	// add tx
-	if err := p.addTx(gossip, tx); err != nil {
+	if err := p.addTx(gossip, tx, true); err != nil {
 		if errors.Is(err, ErrAlreadyKnown) {
 			if p.logger.IsDebug() {
 				p.logger.Debug("rejecting known tx (gossip)", "hash", tx.Hash.String())
@@ -957,7 +986,7 @@ func (p *TxPool) resetAccounts(stateNonces map[types.Address]uint64) {
 
 	// pool cleanup callback
 	cleanup := func(stale []*types.Transaction) {
-		p.index.remove(stale...)
+		p.removeFromIndex(stale...)
 		p.gauge.decrease(slotsRequired(stale...))
 	}
 
@@ -1040,6 +1069,119 @@ func (p *TxPool) Length() uint64 {
 	return p.accounts.promoted()
 }
 
+func (p *TxPool) storeNewTransaction(tx *types.Transaction) {
+	p.dbMtx.Lock()
+	defer p.dbMtx.Unlock()
+
+	existing, err := p.db.Get(dbKey)
+	if err != nil {
+		p.logger.Error("failed to fetch existing transactions", "err", err)
+		return
+	}
+	var data map[types.Hash]*types.Transaction
+	if existing != nil {
+		data, err = unmarshallTransactions(existing)
+		if err != nil {
+			p.logger.Error("failed to unmarshall existing transactions", "err", err)
+			return
+		}
+	} else {
+		data = make(map[types.Hash]*types.Transaction)
+	}
+
+	data[tx.Hash] = tx
+
+	marshalled, err := marshallTransactions(data)
+
+	err = p.db.Put(dbKey, marshalled)
+	if err != nil {
+		p.logger.Error("failed to persist new transaction", "err", err)
+	}
+}
+
+func (p *TxPool) purgeTransactionsFromStorage(txs []*types.Transaction) {
+	p.dbMtx.Lock()
+	defer p.dbMtx.Unlock()
+
+	existing, err := p.db.Get(dbKey)
+	if err != nil {
+		p.logger.Error("failed to fetch existing transactions", "err", err)
+		return
+	}
+	if len(existing) == 0 {
+		return
+	}
+
+	stored, err := unmarshallTransactions(existing)
+	if err != nil {
+		p.logger.Error("failed to unmarshall existing transactions", "err", err)
+		return
+	}
+
+	for _, tx := range txs {
+		delete(stored, tx.Hash)
+	}
+
+	newValue, err := marshallTransactions(stored)
+	if err != nil {
+		p.logger.Error("failed to marshall purged transactions", "err", err)
+		return
+	}
+
+	err = p.db.Put(dbKey, newValue)
+	if err != nil {
+		p.logger.Error("failed to persist newly purged transactions", "err", err)
+	}
+}
+
+func (p *TxPool) loadTransactionsFromStorage() error {
+	p.dbMtx.Lock()
+	defer p.dbMtx.Unlock()
+
+	if p.db == nil {
+		return nil
+	}
+
+	existing, err := p.db.Get(dbKey)
+	if err != nil {
+		return err
+	}
+	if existing == nil {
+		// nothing to load
+		return nil
+	}
+
+	stored, err := unmarshallTransactions(existing)
+	if err != nil {
+		return err
+	}
+
+	for _, tx := range stored {
+		err = p.addTx(local, tx, false)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (p *TxPool) addToIndex(tx *types.Transaction, persist bool) bool {
+	ok := p.index.add(tx)
+	if persist && p.db != nil {
+		p.storeNewTransaction(tx)
+	}
+
+	return ok
+}
+
+func (p *TxPool) removeFromIndex(tx ...*types.Transaction) {
+	p.index.remove(tx...)
+	if p.db != nil {
+		p.purgeTransactionsFromStorage(tx)
+	}
+}
+
 // toHash returns the hash(es) of given transaction(s)
 func toHash(txs ...*types.Transaction) (hashes []types.Hash) {
 	for _, tx := range txs {
@@ -1047,4 +1189,17 @@ func toHash(txs ...*types.Transaction) (hashes []types.Hash) {
 	}
 
 	return
+}
+
+func marshallTransactions(input map[types.Hash]*types.Transaction) ([]byte, error) {
+	return json.Marshal(input)
+}
+
+func unmarshallTransactions(data []byte) (map[types.Hash]*types.Transaction, error) {
+	var res map[types.Hash]*types.Transaction
+	err := json.Unmarshal(data, &res)
+	if err != nil {
+		return nil, err
+	}
+	return res, nil
 }

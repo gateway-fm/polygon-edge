@@ -389,7 +389,12 @@ func (t *StructTracer) ExecuteState(
 		//call.gasUsed = gasUsed
 		t.callStack[size-1].callFrames = append(t.callStack[size-1].callFrames, call)
 	} else {
-		t.callStack[len(t.callStack)-1].logs = append(t.callStack[len(t.callStack)-1].logs, log)
+		if t.callStack == nil {
+			t.callStack = []*callFrame{&callFrame{}}
+			t.callStack[0].logs = append(t.callStack[0].logs, log)
+		} else {
+			t.callStack[len(t.callStack)-1].logs = append(t.callStack[len(t.callStack)-1].logs, log)
+		}
 	}
 }
 

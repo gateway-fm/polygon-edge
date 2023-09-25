@@ -2,11 +2,19 @@ package polybft
 
 import (
 	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/big"
 	mrand "math/rand"
+	"strings"
 	"testing"
+
+	"github.com/hashicorp/go-hclog"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+	"github.com/umbracle/fastrlp"
 
 	"github.com/0xPolygon/polygon-edge/chain"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
@@ -15,11 +23,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/wallet"
 	"github.com/0xPolygon/polygon-edge/crypto"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/hashicorp/go-hclog"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
-	"github.com/umbracle/fastrlp"
 )
 
 func TestExtra_Encoding(t *testing.T) {
@@ -775,4 +778,18 @@ func TestCheckpointData_Copy(t *testing.T) {
 	// alter arbitrary field on copied instance
 	copied.BlockRound = 10
 	require.NotEqual(t, original.BlockRound, copied.BlockRound)
+}
+
+func Test_DebugExtraData(t *testing.T) {
+	h := "0x0000000000000000000000000000000000000000000000000000000000000000f90158f8a7f8a3f8a1947a9e7e27e85abdac536ef0a3b18e1e214ef4ac77b8801bb2fd95f58670f2b9bff24d120d245f363dc60cadd3c64b7908dda47d7037bb02aaaae78e2b29960181f99b0feefdf63054d0130837056e33fd9e3428208ed7084eaf24f6d450db93e90a5203bca42dd21e5249a03d37c0b370c3e8a55107fc254c26cf49c3d29d6b0375d4da754188296c707e6c1ed0b97dcdee0615c5d5e1880de0b6b3a764000001c080f843b840159204dcc4c988bb1ed8454021976eae29193787752010b9e91e054a6eb864bf22fe1c049f613930e969595ec71376140ff5d9e7415f188060486a848d4ebbfb0bc28080f8658033a0a1819969f74feca0d855b6ed6800017b9e0a1a264ae4ef9a637ff6f477a354aca0a5344a663acc1ad673bb065fe07d46620160dd46dc7dc83b638f8fadc7a47f8ea00000000000000000000000000000000000000000000000000000000000000000"
+	h = strings.TrimPrefix(h, "0x")
+	data, err := hex.DecodeString(h)
+	if err != nil {
+		t.Fatal(err)
+	}
+	extra := &Extra{}
+	err = extra.UnmarshalRLP(data)
+	if err != nil {
+		t.Fatal(err)
+	}
 }

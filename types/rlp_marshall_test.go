@@ -31,7 +31,8 @@ func Test_RlpMarshallAccessList_EncodesAndDecodesAsExpected(t *testing.T) {
 
 	RlpEncodeAccessList(a, vv, tuple)
 
-	decoded, err := RlpDecodeAccessList(vv)
+	element := vv.Get(0)
+	decoded, err := RlpDecodeAccessList(element)
 	assert.NoError(t, err)
 	assert.Equal(t, tuple, decoded)
 }

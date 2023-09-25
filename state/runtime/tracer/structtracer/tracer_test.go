@@ -195,6 +195,7 @@ func TestStructTracerTxStart(t *testing.T) {
 			gasLimit:      gasLimit,
 			currentMemory: make([]([]byte), 1),
 			currentStack:  make([]([]*big.Int), 1),
+			callStack:     make([]*callFrame, 0),
 		},
 		tracer,
 	)
@@ -220,6 +221,7 @@ func TestStructTracerTxEnd(t *testing.T) {
 			storage: []map[types.Address]map[types.Hash]types.Hash{
 				make(map[types.Address]map[types.Hash]types.Hash),
 			},
+			callStack:     make([]*callFrame, 0),
 			gasLimit:      gasLimit,
 			consumedGas:   gasLimit - gasLeft,
 			currentMemory: make([]([]byte), 1),
@@ -283,6 +285,8 @@ func TestStructTracerCallEnd(t *testing.T) {
 				err:           err,
 				currentMemory: make([]([]byte), 1),
 				currentStack:  make([]([]*big.Int), 1),
+				callStack:     make([]*callFrame, 0),
+				justExited:    false,
 			},
 		},
 		{
@@ -297,6 +301,8 @@ func TestStructTracerCallEnd(t *testing.T) {
 				},
 				currentMemory: make([]([]byte), 1),
 				currentStack:  make([]([]*big.Int), 1),
+				callStack:     make([]*callFrame, 0),
+				justExited:    true,
 			},
 		},
 	}
@@ -918,10 +924,13 @@ func TestStructTracerGetResult(t *testing.T) {
 		{
 			name: "should return result",
 			tracer: &StructTracer{
-				Config:      testEmptyConfig,
+				Config:      Config{EnableMemory: true, EnableStack: true, EnableStorage: true, EnableReturnData: true},
 				logs:        logs,
 				consumedGas: consumedGas,
 				output:      returnData,
+				callStack: []*callFrame{{
+					logs: logs,
+				}},
 			},
 			expected: &StructTraceResult{
 				Failed:      false,
@@ -960,11 +969,15 @@ func TestStructTracerGetResult(t *testing.T) {
 		{
 			name: "should return empty ReturnValue if error is marked",
 			tracer: &StructTracer{
-				Config:      testEmptyConfig,
+				Config:      Config{EnableStack: true, EnableStorage: true, EnableReturnData: true, EnableMemory: true},
 				logs:        logs,
 				consumedGas: consumedGas,
 				output:      returnData,
 				err:         err,
+				callStack: []*callFrame{{
+					logs: logs,
+				},
+				},
 			},
 			expected: &StructTraceResult{
 				Failed:      true,

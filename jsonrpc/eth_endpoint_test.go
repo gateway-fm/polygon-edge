@@ -304,7 +304,7 @@ func newTestEthEndpoint(store JSONRPCStore) *Eth {
 	c := NewStoreContainer(nil)
 	c.AddStore(store, nil)
 	return &Eth{
-		hclog.NewNullLogger(), c, 100, nil, 0,
+		hclog.NewNullLogger(), c, 100, nil, 0, nil,
 	}
 }
 
@@ -312,7 +312,7 @@ func newTestEthEndpointWithPriceLimit(store JSONRPCStore, priceLimit uint64) *Et
 	c := NewStoreContainer(nil)
 	c.AddStore(store, nil)
 	return &Eth{
-		hclog.NewNullLogger(), c, 100, nil, priceLimit,
+		hclog.NewNullLogger(), c, 100, nil, priceLimit, nil,
 	}
 }
 

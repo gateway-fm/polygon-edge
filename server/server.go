@@ -105,6 +105,7 @@ type Server struct {
 
 	// address for where the json RPC should handoff eth_sendRawTransaction requests to
 	txHandoff string
+	txpoolStorage  txpool.Storage
 }
 
 // newFileLogger returns logger instance that writes all logs to a specified file.
@@ -160,6 +161,7 @@ func NewManagedServer(
 	storeContainer *jsonrpc.StoreContainer,
 	isRelayer bool,
 	txHandoff string,
+	txpoolDb txpool.Storage,
 ) (*Server, error) {
 	m := &Server{
 		config:             config,
@@ -174,6 +176,7 @@ func NewManagedServer(
 		restoreProgression: progress.NewProgressionWrapper(progress.ChainSyncRestore),
 		isRelayer:          isRelayer,
 		txHandoff:          txHandoff,
+		txpoolStorage:      txpoolDb,
 	}
 
 	m.executor = state.NewExecutor(config.Chain.Params, st, logger)
@@ -434,7 +437,9 @@ func (m *Server) build(
 				PriceLimit:         m.config.PriceLimit,
 				MaxAccountEnqueued: m.config.MaxAccountEnqueued,
 				ChainID:            big.NewInt(m.config.Chain.Params.ChainID),
+				DataDir:            m.config.DataDir,
 			},
+			m.txpoolStorage,
 		)
 		if err != nil {
 			return nil, err

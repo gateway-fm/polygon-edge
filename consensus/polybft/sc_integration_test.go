@@ -264,8 +264,9 @@ func TestIntegration_CommitEpoch(t *testing.T) {
 	// init validator sets
 	validatorSetSize := []int{5, 10, 50, 100}
 
-	intialBalance := uint64(5 * math.Pow(10, 18))              // 5 tokens
-	reward := new(big.Int).SetUint64(uint64(math.Pow(10, 18))) // 1 token
+	intialBalance := uint64(5 * math.Pow(10, 18))                 // 5 tokens
+	rewardBig := new(big.Int).SetUint64(uint64(math.Pow(10, 18))) // 1 token
+	reward := hex.EncodeBig(rewardBig)
 	walletAddress := types.StringToAddress("1234889893")
 
 	validatorSets := make([]*validator.TestValidators, len(validatorSetSize), len(validatorSetSize))
