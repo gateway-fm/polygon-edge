@@ -121,7 +121,12 @@ func (c *CallTracer) CallStart(depth int, from, to types.Address, callType int, 
 
 func (c *CallTracer) CallEnd(depth int, output []byte, err error) {
 	c.activeCall.Output = "0x" + hex.EncodeToString(output)
-	c.activeCall.GasUsed = hex.EncodeUint64(c.activeCall.startGas - c.activeAvailableGas)
+	var gasUsed uint64 = 0
+	if c.activeCall.startGas > c.activeAvailableGas {
+		gasUsed = c.activeCall.startGas - c.activeAvailableGas
+	}
+	c.activeCall.GasUsed = hex.EncodeUint64(gasUsed)
+	c.activeGas = 0
 
 	if depth > 1 {
 		c.activeCall = c.activeCall.parent

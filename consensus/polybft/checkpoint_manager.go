@@ -182,7 +182,9 @@ func (c *checkpointManager) submitCheckpoint(latestHeader *types.Header, isEndOf
 		parentEpochNumber := parentExtra.Checkpoint.EpochNumber
 		currentEpochNumber := currentExtra.Checkpoint.EpochNumber
 		// send pending checkpoints only for epoch ending blocks
-		if blockNumber == 1 || blockNumber == c.forkBlock || parentEpochNumber == currentEpochNumber {
+		if blockNumber == 1 ||
+			blockNumber == c.forkBlock ||
+			parentEpochNumber == currentEpochNumber {
 			parentHeader = currentHeader
 			parentExtra = currentExtra
 
@@ -344,7 +346,7 @@ func (c *checkpointManager) PostBlock(req *PostBlockRequest) error {
 
 	isCheckpoint := c.isCheckpointBlock(req.FullBlock.Block.Header.Number, req.IsEpochEndingBlock)
 
-	if isCheckpoint {
+	if isCheckpoint && c.rootChainRelayer != nil {
 		c.logger.Info("sending checkpoint to rootchain")
 		go func(header *types.Header, epochNumber uint64) {
 			if err := c.submitCheckpoint(header, req.IsEpochEndingBlock); err != nil {
