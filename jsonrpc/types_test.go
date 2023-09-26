@@ -254,6 +254,7 @@ func mockTxn() *transaction {
 		BlockNumber: argUintPtr(1),
 		TxIndex:     argUintPtr(2),
 		Type:        argUint64(types.LegacyTx),
+		ChainID:     argBigPtr(big.NewInt(0)),
 	}
 
 	return tt
