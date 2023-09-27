@@ -623,12 +623,18 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 
 	// Run the transaction with the specified gas value.
 	// Returns a status indicating if the transaction failed and the accompanying error
-	testTransaction := func(gas uint64, shouldOmitErr bool) (bool, error) {
+	testTransaction := func(gas uint64, shouldOmitErr bool) (bool, interface{}, error) {
+		var data interface{}
+
 		// Create a dummy transaction with the new gas
 		txn := transaction.Copy()
 		txn.Gas = gas
 
 		result, applyErr := store.ApplyTxn(header, txn, nil)
+
+		if result != nil {
+			data = []byte(hex.EncodeToString(result.ReturnValue))
+		}
 
 		if applyErr != nil {
 			// Check the application error.
@@ -637,10 +643,10 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 				// Specifying the transaction failed, but not providing an error
 				// is an indication that a valid error occurred due to low gas,
 				// which will increase the lower bound for the search
-				return true, nil
+				return true, data, nil
 			}
 
-			return true, applyErr
+			return true, data, applyErr
 		}
 
 		// Check if an out of gas error happened during EVM execution
@@ -649,31 +655,31 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 				// Specifying the transaction failed, but not providing an error
 				// is an indication that a valid error occurred due to low gas,
 				// which will increase the lower bound for the search
-				return true, nil
+				return true, data, nil
 			}
 
 			if isEVMRevertError(result.Err) {
 				// The EVM reverted during execution, attempt to extract the
 				// error message and return it
-				return true, constructErrorFromRevert(result)
+				return true, data, constructErrorFromRevert(result)
 			}
 
-			return true, result.Err
+			return true, data, result.Err
 		}
 
-		return false, nil
+		return false, nil, nil
 	}
 
 	// Start the binary search for the lowest possible gas price
 	for lowEnd < highEnd {
 		mid := (lowEnd + highEnd) / 2
 
-		failed, testErr := testTransaction(mid, true)
+		failed, retVal, testErr := testTransaction(mid, true)
 		if testErr != nil &&
 			!isEVMRevertError(testErr) {
 			// Reverts are ignored in the binary search, but are checked later on
 			// during the execution for the optimal gas limit found
-			return 0, testErr
+			return retVal, testErr
 		}
 
 		if failed {
@@ -686,10 +692,10 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 	}
 
 	// Check if the highEnd is a good value to make the transaction pass
-	failed, err := testTransaction(highEnd, false)
+	failed, retVal, err := testTransaction(highEnd, false)
 	if failed {
 		// The transaction shouldn't fail, for whatever reason, at highEnd
-		return 0, fmt.Errorf(
+		return retVal, fmt.Errorf(
 			"unable to apply transaction even for the highest gas limit %d: %w",
 			highEnd,
 			err,
