@@ -74,7 +74,7 @@ func (v *validatorsSnapshotCache) GetSnapshot(
 		// because there are cases we need the snapshot for the latest block in chain
 		return nil, err
 	}
-	if blockNumber == forkBlock {
+	if blockNumber == forkBlock && forkBlock > 0 {
 		epochEndingBlock = false
 	}
 
