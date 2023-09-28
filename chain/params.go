@@ -85,7 +85,8 @@ func (p *Params) GetEngine() string {
 
 func (p *Params) IsPalm() bool {
 	return p.ChainID == 11297108099 || // testnet
-		p.ChainID == 11297108109 // mainnet
+		p.ChainID == 11297108109 || // mainnet
+		p.ChainID == 123456 // private
 }
 
 // predefined forks
