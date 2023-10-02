@@ -166,10 +166,13 @@ func (e *Executor) ProcessBlock(
 			return nil, err
 		}
 
-		txn.state.FinaliseTx()
+		if block.Header.Number < e.config.ForkBlock {
+			txn.state.FinaliseTx()
+		}
 
 		// now get the output from the tracer
 		//outputCsv := tr.GetLogsCsv()
+		//_ = outputCsv
 		//e.logger.Debug("Transaction trace", "block", block.Number(), "idx", idx, "output", outputCsv)
 	}
 
