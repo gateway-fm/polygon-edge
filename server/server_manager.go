@@ -299,7 +299,7 @@ func (m *Manager) loadNextFork() error {
 					}
 					m.logger.Info("Inserted polybft transition block", "height", header.Number+1)
 					fmt.Println()
-					fmt.Println(mascot)
+					m.logger.Info(mascot)
 					fmt.Println()
 				}
 			}

@@ -111,7 +111,7 @@
           "bn256G2Addr": "0x727E0FC6141644d5A59E5D3cED0B34100f178485",
           "jsonRPCEndpoint": "https://rpc.goerli.eth.gateway.fm",
           "eventTrackerStartBlocks": {
-            "0xfB1253097a58d86b2Cb799998A489445c37D0388": 9807460
+            "0xfB1253097a58d86b2Cb799998A489445c37D0388": 9796580
           }
         },
         "epochSize": 2160,
