@@ -244,6 +244,5 @@
     "/ip4/31.171.241.19/tcp/30301/p2p/16Uiu2HAmGn2kNu2DBYxQpwNizCxH1L5wn127KjpHphb6pWtgP32j"
   ],
   "devp2pBootnodes": [
-    "enode://44f2713dcdf335ab415213d099aac373b1bf147e592d5d40790b45a2ae132d5c37cdbd4832c2bc5bebe1fce23d551ed97a1cb5344731985587e02c3339ed9277@94.156.203.198:30401"
   ]
 }

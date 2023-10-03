@@ -166,7 +166,7 @@ func (e *Executor) ProcessBlock(
 			return nil, err
 		}
 
-		if block.Header.Number < e.config.ForkBlock {
+		if e.config.StopBlock != nil && block.Header.Number <= *e.config.StopBlock {
 			txn.state.FinaliseTx()
 		}
 
