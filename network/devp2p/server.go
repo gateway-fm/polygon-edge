@@ -46,16 +46,13 @@ func NewServer(logger hclog.Logger, cfg *Config, bc *blockchain.Blockchain) (*Se
 			Run: func(p *p2p.Peer, rw p2p.MsgReadWriter) error {
 				peerId := p.ID().String()
 
-				// todo: should terminal difficulty be set here in the new peer?
 				pr := NewPeer(peerId, v, p, rw, big.NewInt(0))
 
 				srv.peerCollection.AddPeer(pr)
 
 				logger.Info("added peer", "enode", p.Info().Enode, "peerId", peerId)
 
-				err := srv.RunPeer(pr)
-
-				bc.NewBlockNumberAnnounced(pr.highestBlock)
+				err := srv.RunPeer(pr, bc)
 
 				return err
 
@@ -164,7 +161,7 @@ func (s *Server) Stop() {
 	s.p2p.Stop()
 }
 
-func (s *Server) RunPeer(pr *Peer) error {
+func (s *Server) RunPeer(pr *Peer, bc *blockchain.Blockchain) error {
 	// perform the handshake - read their status message and send our own
 	noErrorForkIdFilter := func(id forkid.ID) error { return nil }
 	err := pr.Handshake(
@@ -179,6 +176,8 @@ func (s *Server) RunPeer(pr *Peer) error {
 		s.logger.Error("error performing peer handshake", "err", err, "peerId", pr.id)
 		return err
 	}
+
+	bc.NewBlockNumberAnnounced(pr.highestBlock)
 
 	// now start listening for messages on the peer
 	for {
