@@ -675,11 +675,16 @@ func (e *Eth) EstimateGas(arg *txnArgs, rawNum *BlockNumber) (interface{}, error
 		mid := (lowEnd + highEnd) / 2
 
 		failed, retVal, testErr := testTransaction(mid, true)
-		if testErr != nil &&
-			!isEVMRevertError(testErr) {
-			// Reverts are ignored in the binary search, but are checked later on
-			// during the execution for the optimal gas limit found
-			return retVal, testErr
+		if testErr != nil {
+			if testErr.Error() == state.ErrNotEnoughIntrinsicGas.Error() {
+				// hitting an intrinsic gas problem should halt the binary search
+				break
+			}
+			if !isEVMRevertError(testErr) {
+				// Reverts are ignored in the binary search, but are checked later on
+				// during the execution for the optimal gas limit found
+				return retVal, testErr
+			}
 		}
 
 		if failed {
