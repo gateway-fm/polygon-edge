@@ -112,6 +112,8 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 	blockchainMock.On("GetHeaderByNumber", mock.Anything).Return(headersMap.getHeader)
 	blockchainMock.On("GetHeaderByHash", mock.Anything).Return(headersMap.getHeaderByHash)
 
+	stopBlock := uint64(0)
+
 	// create polybft with appropriate mocks
 	polybft := &Polybft{
 		closeCh:         make(chan struct{}),
@@ -124,6 +126,15 @@ func TestPolybft_VerifyHeader(t *testing.T) {
 			blockchainMock,
 			0,
 		),
+		config: &consensus.Params{
+			Config: &consensus.Config{
+				Params: &chain.Params{
+					StopBlock: &stopBlock,
+					ForkBlock: 0,
+				},
+			},
+		},
+		runtime: &consensusRuntime{config: &runtimeConfig{forkBlock: 0}},
 	}
 
 	// create parent header (block 10)
@@ -302,6 +313,7 @@ func Test_GenesisPostHookFactory(t *testing.T) {
 				RewardConfig:        &RewardsConfig{WalletAmount: ethgo.Ether(1000)},
 				NativeTokenConfig:   &TokenConfig{Name: "Test", Symbol: "TEST", Decimals: 18},
 				MaxValidatorSetSize: maxValidators,
+				EpochReward:         "0x0",
 			},
 		},
 		{
@@ -313,6 +325,7 @@ func Test_GenesisPostHookFactory(t *testing.T) {
 				RewardConfig:        &RewardsConfig{WalletAmount: ethgo.Ether(1000)},
 				NativeTokenConfig:   &TokenConfig{Name: "Test Mintable", Symbol: "TEST_MNT", Decimals: 18, IsMintable: true},
 				MaxValidatorSetSize: maxValidators,
+				EpochReward:         "0x0",
 			},
 			bridgeAllowList: &chain.AddressListConfig{
 				AdminAddresses:   []types.Address{validators.Validators["0"].Address()},

@@ -142,6 +142,12 @@ func (c *checkpointManager) submitCheckpoint(latestHeader *types.Header, isEndOf
 		}
 	}
 
+	if lastCheckpointBlockNumber > latestHeader.Number {
+		// node is out of sync (hasn't reached the tip of the chain), so although we are in a position to send the checkpoint
+		// it would attempt sending an old checkpoint again so we just skip it
+		return nil
+	}
+
 	c.logger.Debug("submitCheckpoint invoked...",
 		"latest checkpoint block", lastCheckpointBlockNumber,
 		"checkpoint block", latestHeader.Number)

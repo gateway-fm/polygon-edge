@@ -9,6 +9,11 @@ import (
 	"time"
 
 	"github.com/0xPolygon/go-ibft/messages/proto"
+	"github.com/hashicorp/go-hclog"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
+	"github.com/stretchr/testify/require"
+
 	"github.com/0xPolygon/polygon-edge/consensus"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/bitmap"
 	"github.com/0xPolygon/polygon-edge/consensus/polybft/contractsapi"
@@ -18,10 +23,6 @@ import (
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/helper/common"
 	"github.com/0xPolygon/polygon-edge/types"
-	"github.com/hashicorp/go-hclog"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/mock"
-	"github.com/stretchr/testify/require"
 )
 
 func TestConsensusRuntime_isFixedSizeOfEpochMet_NotReachedEnd(t *testing.T) {
@@ -525,6 +526,7 @@ func TestConsensusRuntime_restartEpoch_SameEpochNumberAsTheLastOne(t *testing.T)
 		lastBuiltBlock: &types.Header{
 			Number: originalBlockNumber,
 		},
+		logger: hclog.NewNullLogger(),
 	}
 	runtime.setIsActiveValidator(true)
 
@@ -580,6 +582,7 @@ func TestConsensusRuntime_calculateCommitEpochInput_SecondEpoch(t *testing.T) {
 			FirstBlockInEpoch: epochStartBlock,
 		},
 		lastBuiltBlock: lastBuiltBlock,
+		logger:         hclog.NewNullLogger(),
 	}
 
 	commitEpochInput, distributeRewardsInput, err := consensusRuntime.calculateCommitEpochInput(lastBuiltBlock,

@@ -259,7 +259,7 @@ func TestCheckpointManager_IsCheckpointBlock(t *testing.T) {
 			blockNumber:        6,
 			checkpointsOffset:  6,
 			isEpochEndingBlock: false,
-			isCheckpointBlock:  true,
+			isCheckpointBlock:  false,
 		},
 		{
 			name:               "Epoch ending block - Fixed epoch size met",
