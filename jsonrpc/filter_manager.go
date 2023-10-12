@@ -11,7 +11,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/hashicorp/go-hclog"
 
@@ -69,8 +68,10 @@ type filterBase struct {
 
 // newFilterBase initializes filterBase with unique ID
 func newFilterBase(ws wsConn) filterBase {
+	now := time.Now().UnixNano()
+	id := fmt.Sprintf("0x%x", now)
 	return filterBase{
-		id:        uuid.New().String(),
+		id:        id,
 		ws:        ws,
 		heapIndex: NoIndexInHeap,
 	}
