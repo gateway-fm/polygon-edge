@@ -29,7 +29,7 @@ var (
 )
 
 // defaultTimeout is the timeout to remove the filters that don't have a web socket stream
-var defaultTimeout = 1 * time.Minute
+var defaultTimeout = 30 * time.Minute
 
 const (
 	// The index in heap which is indicating the element is not in the heap
