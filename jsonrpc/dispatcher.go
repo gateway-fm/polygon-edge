@@ -461,6 +461,11 @@ func (d *Dispatcher) handleReq(req Request) ([]byte, Error) {
 			}
 		}
 
+		var invalidParamsError *invalidParamsError
+		if errors.As(err, &invalidParamsError) {
+			return data, NewInvalidParamsError(err.Error())
+		}
+
 		return data, NewInvalidRequestError(err.Error())
 	}
 

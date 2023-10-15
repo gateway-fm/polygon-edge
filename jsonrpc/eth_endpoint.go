@@ -722,6 +722,10 @@ func (e *Eth) GetFilterLogs(id string) (interface{}, error) {
 
 // GetLogs returns an array of logs matching the filter options
 func (e *Eth) GetLogs(query *LogQuery) (interface{}, error) {
+	if query == nil {
+		return nil, &invalidParamsError{err: "missing value for required argument 0"}
+	}
+
 	return e.filterManager.GetLogsForQuery(query)
 }
 
