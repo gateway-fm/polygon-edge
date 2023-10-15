@@ -7,15 +7,17 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/0xPolygon/polygon-edge/helper/common"
-	"github.com/0xPolygon/polygon-edge/helper/hex"
-	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/hashicorp/go-hclog"
 	lru "github.com/hashicorp/golang-lru"
 
-	"github.com/0xPolygon/polygon-edge/chain"
+	"github.com/0xPolygon/polygon-edge/helper/common"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
+	"github.com/0xPolygon/polygon-edge/state"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/0xPolygon/polygon-edge/chain"
 
 	"github.com/0xPolygon/polygon-edge/blockchain/storage"
 	"github.com/0xPolygon/polygon-edge/blockchain/storage/memory"
@@ -996,15 +998,13 @@ func TestCalculateGasLimit(t *testing.T) {
 func TestGasPriceAverage(t *testing.T) {
 	testTable := []struct {
 		name               string
-		previousAverage    *big.Int
-		previousCount      *big.Int
+		existingTxs        []*big.Int
 		newValues          []*big.Int
 		expectedNewAverage *big.Int
 	}{
 		{
 			"no previous average data",
-			big.NewInt(0),
-			big.NewInt(0),
+			[]*big.Int{},
 			[]*big.Int{
 				big.NewInt(1),
 				big.NewInt(2),
@@ -1017,15 +1017,45 @@ func TestGasPriceAverage(t *testing.T) {
 		{
 			"previous average data",
 			// For example (5 + 5 + 5 + 5 + 5) / 5
-			big.NewInt(5),
-			big.NewInt(5),
+			[]*big.Int{
+				big.NewInt(1),
+				big.NewInt(2),
+				big.NewInt(3),
+				big.NewInt(4),
+				big.NewInt(5),
+				big.NewInt(6),
+				big.NewInt(7),
+				big.NewInt(8),
+				big.NewInt(9),
+				big.NewInt(10),
+				big.NewInt(11),
+				big.NewInt(12),
+				big.NewInt(13),
+				big.NewInt(14),
+				big.NewInt(15),
+				big.NewInt(16),
+				big.NewInt(17),
+				big.NewInt(18),
+				big.NewInt(19),
+				big.NewInt(20),
+				big.NewInt(21),
+				big.NewInt(22),
+				big.NewInt(23),
+				big.NewInt(24),
+				big.NewInt(25),
+				big.NewInt(26),
+				big.NewInt(27),
+				big.NewInt(28),
+				big.NewInt(29),
+				big.NewInt(30),
+			},
 			[]*big.Int{
 				big.NewInt(1),
 				big.NewInt(2),
 				big.NewInt(3),
 			},
 			// (5 * 5 + 1 + 2 + 3) / 8
-			big.NewInt(3),
+			big.NewInt(15),
 		},
 	}
 
@@ -1033,18 +1063,10 @@ func TestGasPriceAverage(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			// Setup the mock data
 			blockchain := NewTestBlockchain(t, nil)
-			blockchain.gpAverage.price = testCase.previousAverage
-			blockchain.gpAverage.count = testCase.previousCount
+			blockchain.gpAverage.txs = testCase.existingTxs
 
 			// Update the average gas price
 			blockchain.updateGasPriceAvg(testCase.newValues)
-
-			// Make sure the average gas price count is correct
-			assert.Equal(
-				t,
-				int64(len(testCase.newValues))+testCase.previousCount.Int64(),
-				blockchain.gpAverage.count.Int64(),
-			)
 
 			// Make sure the average gas price is correct
 			assert.Equal(t, testCase.expectedNewAverage.String(), blockchain.gpAverage.price.String())
@@ -1437,9 +1459,7 @@ func TestBlockchain_WriteFullBlock(t *testing.T) {
 	})
 
 	bc := &Blockchain{
-		gpAverage: &gasPriceAverage{
-			count: new(big.Int),
-		},
+		gpAverage: &gasPriceAverage{},
 		logger:    hclog.NewNullLogger(),
 		db:        storageMock,
 		consensus: consensusMock,

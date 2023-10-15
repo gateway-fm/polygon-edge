@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"sort"
 	"sync"
 	"sync/atomic"
 
@@ -27,6 +28,8 @@ const (
 
 	// defaultCacheSize is the default size for Blockchain LRU cache structures
 	defaultCacheSize int = 100
+
+	transactionsToCalcGasPrice = 30
 )
 
 var (
@@ -85,8 +88,8 @@ type Blockchain struct {
 type gasPriceAverage struct {
 	sync.RWMutex
 
-	price *big.Int // The average gas price that gets queried
-	count *big.Int // Param used in the avg. gas price calculation
+	price *big.Int   // The average gas price that gets queried
+	txs   []*big.Int // holds the transactions used to determine the media
 }
 
 type Verifier interface {
@@ -116,69 +119,88 @@ func (b *Blockchain) updateGasPriceAvg(newValues []*big.Int) {
 	b.gpAverage.Lock()
 	defer b.gpAverage.Unlock()
 
-	// Sum the values for quick reference
-	sum := big.NewInt(0)
-	for _, val := range newValues {
-		sum = sum.Add(sum, val)
-	}
-
 	// There is no previous average data,
 	// so this new value set will instantiate it
-	if b.gpAverage.count.Uint64() == 0 {
-		b.calcArithmeticAverage(newValues, sum)
+	if len(b.gpAverage.txs) == 0 {
+		b.calcArithmeticAverage(newValues)
 
 		return
 	}
 
 	// There is existing average data,
 	// use it to generate a new average
-	b.calcRollingAverage(newValues, sum)
+	b.calcRollingAverage(newValues)
 }
 
 // calcArithmeticAverage calculates and sets the arithmetic average
 // of the passed in data set
-func (b *Blockchain) calcArithmeticAverage(newValues []*big.Int, sum *big.Int) {
-	newAverageCount := big.NewInt(int64(len(newValues)))
-	newAverage := sum.Div(sum, newAverageCount)
+func (b *Blockchain) calcArithmeticAverage(newValues []*big.Int) {
+	// first add the new values to the array
+	prices := make([]*big.Int, 0)
+	prices = append(prices, newValues...)
 
-	b.gpAverage.price = newAverage
-	b.gpAverage.count = newAverageCount
+	block := b.Header().Number
+LOOP:
+	for {
+		if block == 0 {
+			break
+		}
+		block--
+		if block == 0 {
+			break
+		}
+		b, found := b.GetBlockByNumber(block, true)
+		if !found {
+			break
+		}
+		for _, t := range b.Transactions {
+			prices = append(prices, t.GasPrice)
+			if len(prices) >= transactionsToCalcGasPrice {
+				break LOOP
+			}
+		}
+	}
+
+	b.gpAverage.txs = prices
+	b.gpAverage.price = getMedianPrice(prices)
 }
 
 // calcRollingAverage calculates the new average based on the
 // moving average formula:
 // new average = old average * (n-len(M))/n + (sum of values in M)/n)
 // where n is the old average data count, and M is the new data set
-func (b *Blockchain) calcRollingAverage(newValues []*big.Int, sum *big.Int) {
-	var (
-		// Save references to old counts
-		oldCount   = b.gpAverage.count
-		oldAverage = b.gpAverage.price
+func (b *Blockchain) calcRollingAverage(newValues []*big.Int) {
+	// add in the new prices then trim out the older ones
+	b.gpAverage.txs = append(b.gpAverage.txs, newValues...)
+	if len(b.gpAverage.txs) > transactionsToCalcGasPrice {
+		b.gpAverage.txs = b.gpAverage.txs[len(b.gpAverage.txs)-transactionsToCalcGasPrice:]
+	}
 
-		inputSetCount = big.NewInt(0).SetInt64(int64(len(newValues)))
-	)
+	b.gpAverage.price = getMedianPrice(b.gpAverage.txs)
+}
 
-	// old average * (n-len(M))/n
-	newAverage := big.NewInt(0).Div(
-		big.NewInt(0).Mul(
-			oldAverage,
-			big.NewInt(0).Sub(oldCount, inputSetCount),
-		),
-		oldCount,
-	)
+func getMedianPrice(prices []*big.Int) *big.Int {
+	dataCopy := make([]*big.Int, len(prices))
+	copy(dataCopy, prices)
 
-	// + (sum of values in M)/n
-	newAverage.Add(
-		newAverage,
-		big.NewInt(0).Div(
-			sum,
-			oldCount,
-		),
-	)
+	// sort the prices
+	sort.Slice(dataCopy, func(i, j int) bool {
+		return dataCopy[i].Cmp(dataCopy[j]) > 0
+	})
 
-	// Update the references
-	b.gpAverage.price = newAverage
-	b.gpAverage.count = inputSetCount.Add(inputSetCount, b.gpAverage.count)
+	var median *big.Int
+	l := len(dataCopy)
+	if l == 0 {
+		return new(big.Int).SetUint64(0)
+	} else if l%2 == 0 {
+		added := new(big.Int).Add(dataCopy[l/2-1], dataCopy[l/2])
+		div := new(big.Int).Div(added, big.NewInt(2))
+		median = div
+	} else {
+		median = dataCopy[l/2]
+	}
+
+	return median
 }
 
 // GetAvgGasPrice returns the average gas price for the chain
@@ -208,7 +230,7 @@ func NewBlockchain(
 		stream:    &eventStream{},
 		gpAverage: &gasPriceAverage{
 			price: big.NewInt(0),
-			count: big.NewInt(0),
+			txs:   make([]*big.Int, 0),
 		},
 	}
 
