@@ -29,7 +29,7 @@ const (
 	// defaultCacheSize is the default size for Blockchain LRU cache structures
 	defaultCacheSize int = 100
 
-	transactionsToCalcGasPrice = 30
+	blocksForGasCalculation = 100
 )
 
 var (
@@ -88,8 +88,8 @@ type Blockchain struct {
 type gasPriceAverage struct {
 	sync.RWMutex
 
-	price *big.Int   // The average gas price that gets queried
-	txs   []*big.Int // holds the transactions used to determine the media
+	price    *big.Int     // The average gas price that gets queried
+	blockTxs [][]*big.Int // holds the transactions used to determine the gas price
 }
 
 type Verifier interface {
@@ -121,7 +121,7 @@ func (b *Blockchain) updateGasPriceAvg(newValues []*big.Int) {
 
 	// There is no previous average data,
 	// so this new value set will instantiate it
-	if len(b.gpAverage.txs) == 0 {
+	if len(b.gpAverage.blockTxs) == 0 {
 		b.calcArithmeticAverage(newValues)
 
 		return
@@ -136,32 +136,30 @@ func (b *Blockchain) updateGasPriceAvg(newValues []*big.Int) {
 // of the passed in data set
 func (b *Blockchain) calcArithmeticAverage(newValues []*big.Int) {
 	// first add the new values to the array
-	prices := make([]*big.Int, 0)
-	prices = append(prices, newValues...)
+	prices := make([][]*big.Int, 0)
+	prices = append(prices, newValues)
 
 	block := b.Header().Number
-LOOP:
-	for {
-		if block == 0 {
-			break
-		}
-		block--
-		if block == 0 {
+
+	// we already have the most recent blocks transaction prices, so we can reduce the total by 1
+	// and pull transactions for the remaining blocks from the db
+	for i := 0; i < blocksForGasCalculation-1; i++ {
+		blockNum := block - uint64(i+1)
+		if blockNum == 0 {
 			break
 		}
 		b, found := b.GetBlockByNumber(block, true)
 		if !found {
 			break
 		}
-		for _, t := range b.Transactions {
-			prices = append(prices, t.GasPrice)
-			if len(prices) >= transactionsToCalcGasPrice {
-				break LOOP
-			}
+		txs := make([]*big.Int, len(b.Transactions))
+		for idx, t := range b.Transactions {
+			txs[idx] = t.GasPrice
 		}
+		prices = append(prices, txs)
 	}
 
-	b.gpAverage.txs = prices
+	b.gpAverage.blockTxs = prices
 	b.gpAverage.price = getMedianPrice(prices)
 }
 
@@ -171,33 +169,36 @@ LOOP:
 // where n is the old average data count, and M is the new data set
 func (b *Blockchain) calcRollingAverage(newValues []*big.Int) {
 	// add in the new prices then trim out the older ones
-	b.gpAverage.txs = append(b.gpAverage.txs, newValues...)
-	if len(b.gpAverage.txs) > transactionsToCalcGasPrice {
-		b.gpAverage.txs = b.gpAverage.txs[len(b.gpAverage.txs)-transactionsToCalcGasPrice:]
+	b.gpAverage.blockTxs = append(b.gpAverage.blockTxs, newValues)
+	if len(b.gpAverage.blockTxs) > blocksForGasCalculation {
+		b.gpAverage.blockTxs = b.gpAverage.blockTxs[len(b.gpAverage.blockTxs)-blocksForGasCalculation:]
 	}
 
-	b.gpAverage.price = getMedianPrice(b.gpAverage.txs)
+	b.gpAverage.price = getMedianPrice(b.gpAverage.blockTxs)
 }
 
-func getMedianPrice(prices []*big.Int) *big.Int {
-	dataCopy := make([]*big.Int, len(prices))
-	copy(dataCopy, prices)
+func getMedianPrice(blockTxs [][]*big.Int) *big.Int {
+	// flatten out the prices into a single slice
+	prices := make([]*big.Int, 0)
+	for _, p := range blockTxs {
+		prices = append(prices, p...)
+	}
 
 	// sort the prices
-	sort.Slice(dataCopy, func(i, j int) bool {
-		return dataCopy[i].Cmp(dataCopy[j]) > 0
+	sort.Slice(prices, func(i, j int) bool {
+		return prices[i].Cmp(prices[j]) > 0
 	})
 
 	var median *big.Int
-	l := len(dataCopy)
+	l := len(prices)
 	if l == 0 {
 		return new(big.Int).SetUint64(0)
 	} else if l%2 == 0 {
-		added := new(big.Int).Add(dataCopy[l/2-1], dataCopy[l/2])
+		added := new(big.Int).Add(prices[l/2-1], prices[l/2])
 		div := new(big.Int).Div(added, big.NewInt(2))
 		median = div
 	} else {
-		median = dataCopy[l/2]
+		median = prices[l/2]
 	}
 
 	return median
@@ -229,8 +230,8 @@ func NewBlockchain(
 		txSigner:  txSigner,
 		stream:    &eventStream{},
 		gpAverage: &gasPriceAverage{
-			price: big.NewInt(0),
-			txs:   make([]*big.Int, 0),
+			price:    big.NewInt(0),
+			blockTxs: make([][]*big.Int, 0),
 		},
 	}
 
@@ -883,7 +884,7 @@ func (b *Blockchain) WriteFullBlock(fblock *types.FullBlock, source string) erro
 
 	logArgs := []interface{}{
 		"number", header.Number,
-		"txs", len(block.Transactions),
+		"blockTxs", len(block.Transactions),
 		"hash", header.Hash,
 		"parent", header.ParentHash,
 		"source", source,
@@ -954,7 +955,7 @@ func (b *Blockchain) WriteBlock(block *types.Block, source string) error {
 
 	logArgs := []interface{}{
 		"number", header.Number,
-		"txs", len(block.Transactions),
+		"blockTxs", len(block.Transactions),
 		"hash", header.Hash,
 		"parent", header.ParentHash,
 		"source", source,

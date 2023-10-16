@@ -214,8 +214,8 @@ func NewMockBlockchain(
 		config:    config,
 		stream:    &eventStream{},
 		gpAverage: &gasPriceAverage{
-			price: big.NewInt(0),
-			txs:   make([]*big.Int, 0),
+			price:    big.NewInt(0),
+			blockTxs: make([][]*big.Int, 0),
 		},
 	}
 
