@@ -151,7 +151,8 @@
     "engineForks": [
       {
         "engine": "ibft",
-        "to": 5000000000
+        "to": 5000000000,
+        "txHandoff": "http://94.156.203.186:8545"
       },
       {
         "engine": "polybft",
