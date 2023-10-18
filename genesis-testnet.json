@@ -69,25 +69,25 @@
             "address": "0x96386b64043966782645F8764D0A8C28A0A3154F",
             "blsKey": "0b645c17918f7eb46cda35116d81d850a8597cbdbc6a6127eabfd756d455f04110003107a52a8bd80e076e367b2d60c607a74b9f524d614f311a84ddcd5dfd5018e7b76e1714d5b599aff574703650efff2e1950463cb8585ad0445255a525e30bdee6c28041d2d1ae35a6d07664e2a4257e4d9214dde0492bc36bfebf78afc8",
             "stake": "0xde0b6b3a7640000",
-            "multiAddr": "/ip4/31.171.241.134/tcp/30301/p2p/16Uiu2HAmUus1iQVZwo1wGUyuWEr8HxUrENJMsTn23CT7LLymm8td"
+            "multiAddr": "/dns4/palm-testnet-validator-1.eu-south-1.gateway.fm/tcp/30301/p2p/16Uiu2HAmUus1iQVZwo1wGUyuWEr8HxUrENJMsTn23CT7LLymm8td"
           },
           {
             "address": "0x6209292B0952103778e11A314241ecCa832D2D2e",
             "blsKey": "13c61d964b1225d5d5b0f624c9e30d802681287b8205ffcd829d4248fb878932141d86256b35e6ebc242307aacf4b74d93227487e66554b7f737f97149bc2239271779b4ab3f82d915754e9e996a9c3005c67a7eca7cb319e4a9088e7c2a4ea40f4e72c64faf6eab7f6e7536db62cef317d14114de15b7f3ad64b5c5facad9da",
             "stake": "0xde0b6b3a7640000",
-            "multiAddr": "/ip4/31.171.250.72/tcp/30301/p2p/16Uiu2HAmQXKvjZ3W74nTZp3wnAZDW7iMNLmHTgo3jTN5G4HtDUDZ"
+            "multiAddr": "/dns4/palm-testnet-validator-2.eu-south-1.gateway.fm/tcp/30301/p2p/16Uiu2HAmQXKvjZ3W74nTZp3wnAZDW7iMNLmHTgo3jTN5G4HtDUDZ"
           },
           {
             "address": "0xE3B9Bb29771FFA8C6B87559dF5ff57C34214Ef32",
             "blsKey": "147a53234a90d92c519722f8ca8d6e7de3c8bc91111f27caa587a8f6beab711513756c07894974dcbc3bdf75bd75e741b508437434977c27cf894f41ee0074532ad0f7ad05712483f5fadc74306340c53d05a21158fc4232045cf2ee2c3062ab0c254e9be9dd40eb28b3050744e070f48c2540ff8b4f56966174f8cd9287189c",
             "stake": "0xde0b6b3a7640000",
-            "multiAddr": "/ip4/31.171.250.29/tcp/30301/p2p/16Uiu2HAkwyPRKqKcTEywcHjMUsyxDduv4dB4XV4dkEvvLtGpdQSJ"
+            "multiAddr": "/dns4/palm-testnet-validator-3.eu-south-1.gateway.fm/tcp/30301/p2p/16Uiu2HAkwyPRKqKcTEywcHjMUsyxDduv4dB4XV4dkEvvLtGpdQSJ"
           },
           {
             "address": "0xD47D85ccF6C60397500F4EC2bB321FF80a08C51B",
             "blsKey": "085198340bfa7414fb42444be47805e6247b8a6b6d70d25a790b79517e68fc552abc82da9cc21450a6150c99005b1004dde860eedc1f8c5cfcb1650966a9961811e952ab88e3c832db85f42518bfacc04537bce39df517f0f33c055dddef843c087be788bae7a62ce071c0705c3b731395edafb2b2c05cff32991a8bfb7654c5",
             "stake": "0xde0b6b3a7640000",
-            "multiAddr": "/ip4/31.171.241.19/tcp/30301/p2p/16Uiu2HAmGn2kNu2DBYxQpwNizCxH1L5wn127KjpHphb6pWtgP32j"
+            "multiAddr": "/dns4/palm-testnet-validator-4.eu-south-1.gateway.fm/tcp/30301/p2p/16Uiu2HAmGn2kNu2DBYxQpwNizCxH1L5wn127KjpHphb6pWtgP32j"
           }
         ],
         "bridge": {
@@ -238,10 +238,10 @@
     "burnContractDestinationAddress": "0x0000000000000000000000000000000000000000"
   },
   "bootnodes": [
-    "/ip4/31.171.241.134/tcp/30301/p2p/16Uiu2HAmUus1iQVZwo1wGUyuWEr8HxUrENJMsTn23CT7LLymm8td",
-    "/ip4/31.171.250.72/tcp/30301/p2p/16Uiu2HAmQXKvjZ3W74nTZp3wnAZDW7iMNLmHTgo3jTN5G4HtDUDZ",
-    "/ip4/31.171.250.29/tcp/30301/p2p/16Uiu2HAkwyPRKqKcTEywcHjMUsyxDduv4dB4XV4dkEvvLtGpdQSJ",
-    "/ip4/31.171.241.19/tcp/30301/p2p/16Uiu2HAmGn2kNu2DBYxQpwNizCxH1L5wn127KjpHphb6pWtgP32j"
+    "/dns4/palm-testnet-validator-1.eu-south-1.gateway.fm/tcp/30301/p2p/16Uiu2HAmUus1iQVZwo1wGUyuWEr8HxUrENJMsTn23CT7LLymm8td",
+    "/dns4/palm-testnet-validator-2.eu-south-1.gateway.fm/tcp/30301/p2p/16Uiu2HAmQXKvjZ3W74nTZp3wnAZDW7iMNLmHTgo3jTN5G4HtDUDZ",
+    "/dns4/palm-testnet-validator-3.eu-south-1.gateway.fm/tcp/30301/p2p/16Uiu2HAkwyPRKqKcTEywcHjMUsyxDduv4dB4XV4dkEvvLtGpdQSJ",
+    "/dns4/palm-testnet-validator-4.eu-south-1.gateway.fm/tcp/30301/p2p/16Uiu2HAmGn2kNu2DBYxQpwNizCxH1L5wn127KjpHphb6pWtgP32j"
   ],
   "devp2pBootnodes": [
   ]
