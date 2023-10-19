@@ -523,6 +523,13 @@ func (f *FilterManager) GetFilterChanges(id string) (interface{}, error) {
 		f.Unlock()
 	}
 
+	// if the result is nil then return an empty array to save the response going back to the client
+	// as null
+	r, ok := res.([]*Log)
+	if ok && len(r) == 0 {
+		return []interface{}{}, nil
+	}
+
 	return res, err
 }
 
