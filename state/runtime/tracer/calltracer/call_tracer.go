@@ -120,6 +120,15 @@ func (c *CallTracer) CallStart(depth int, from, to types.Address, callType int, 
 }
 
 func (c *CallTracer) CallEnd(depth int, output []byte, err error) {
+	if c.activeCall == nil {
+		// there may be no active call so just check for an error condition and return early
+		if err != nil {
+			c.Cancel(err)
+		}
+		c.activeGas = 0
+		return
+	}
+
 	c.activeCall.Output = "0x" + hex.EncodeToString(output)
 	var gasUsed uint64 = 0
 	if c.activeCall.startGas > c.activeAvailableGas {
