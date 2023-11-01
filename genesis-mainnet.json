@@ -273,6 +273,5 @@
     "/dns4/palm-mainnet-validator-8.eu-south-1.gateway.fm/tcp/30301/p2p/16Uiu2HAmHYkxfLJEyhZzs2UWv9mtUHYzSrMTpDcQMaAavs5fiR6f"
   ],
   "devp2pBootnodes": [
-    "enode://12c604a8d2187e97115ce277a3571f964d26ccb7f0fd289a6326c10407b0ee9b03337ff0d6fe18d6bdb560ec4724fa46e0f8be3d96b024a8b1ff95e0f2bb426d@94.156.203.186:30303"
   ]
 }
