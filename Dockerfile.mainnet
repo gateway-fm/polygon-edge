@@ -1,6 +1,7 @@
 FROM golang:1.20-alpine AS builder
 ARG VERSION
 ENV VERSION ${VERSION}
+ARG APIKEY
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
@@ -8,7 +9,7 @@ COPY . .
 RUN apk update
 RUN apk add --no-cache jq make
 RUN CGO_ENABLED=0 GOOS=linux go build -o polygon-edge -ldflags "-X 'github.com/0xPolygon/polygon-edge/versioning.Version=${VERSION}'"
-RUN ./scripts/palm-genesis-mainnet.sh
+RUN ./scripts/palm-genesis-mainnet.sh ${APIKEY}
 
 FROM alpine:3.18 as runner
 COPY --from=builder /app/polygon-edge /app/polygon-edge
