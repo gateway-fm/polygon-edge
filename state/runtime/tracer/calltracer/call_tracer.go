@@ -11,12 +11,14 @@ import (
 
 var (
 	callTypes = map[int]string{
-		0: "CALL",
-		1: "CALLCODE",
-		2: "DELEGATECALL",
-		3: "STATICCALL",
-		4: "CREATE",
-		5: "CREATE2",
+		0:   "CALL",
+		1:   "CALLCODE",
+		2:   "DELEGATECALL",
+		3:   "STATICCALL",
+		4:   "CREATE",
+		5:   "CREATE2",
+		240: "CREATE",
+		245: "CREATE2",
 	}
 )
 
@@ -68,7 +70,12 @@ func (c *CallTracer) cancelled() bool {
 }
 
 func (c *CallTracer) Clear() {
+	c.cancelLock.Lock()
+	defer c.cancelLock.Unlock()
+
 	c.call = nil
+	c.stop = false
+	c.reason = nil
 }
 
 func (c *CallTracer) GetResult() (interface{}, error) {
