@@ -30,6 +30,7 @@ const (
 	priceLimitFlag               = "price-limit"
 	jsonRPCBatchRequestLimitFlag = "json-rpc-batch-request-limit"
 	jsonRPCBlockRangeLimitFlag   = "json-rpc-block-range-limit"
+	jsonRPCLogTimingsFlag        = "json-rpc-log-timings"
 	maxSlotsFlag                 = "max-slots"
 	maxEnqueuedFlag              = "max-enqueued"
 	blockGasTargetFlag           = "block-gas-target"
@@ -155,6 +156,7 @@ func (p *serverParams) generateConfig() *server.Config {
 			AccessControlAllowOrigin: p.rawConfig.CorsAllowedOrigins,
 			BatchLengthLimit:         p.rawConfig.JSONRPCBatchRequestLimit,
 			BlockRangeLimit:          p.rawConfig.JSONRPCBlockRangeLimit,
+			LogTimings:               p.rawConfig.JSONRPCLogTimings,
 		},
 		GRPCAddr:   p.grpcAddress,
 		LibP2PAddr: p.libp2pAddress,

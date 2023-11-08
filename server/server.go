@@ -104,8 +104,8 @@ type Server struct {
 	isRelayer bool
 
 	// address for where the json RPC should handoff eth_sendRawTransaction requests to
-	txHandoff string
-	txpoolStorage  txpool.Storage
+	txHandoff     string
+	txpoolStorage txpool.Storage
 }
 
 // newFileLogger returns logger instance that writes all logs to a specified file.
@@ -981,6 +981,7 @@ func (s *Server) setupJSONRPC() error {
 		BatchLengthLimit:         s.config.JSONRPC.BatchLengthLimit,
 		BlockRangeLimit:          s.config.JSONRPC.BlockRangeLimit,
 		TxHandoff:                s.txHandoff,
+		LogTimings:               s.config.JSONRPC.LogTimings,
 	}
 
 	srv, err := jsonrpc.NewJSONRPC(s.logger, conf)

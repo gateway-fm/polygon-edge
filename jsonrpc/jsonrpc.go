@@ -48,7 +48,7 @@ type JSONRPC struct {
 type dispatcher interface {
 	RemoveFilterByWs(conn wsConn)
 	HandleWs(reqBody []byte, conn wsConn) ([]byte, error)
-	Handle(reqBody []byte) ([]byte, error)
+	Handle(reqBody []byte, timings *timings) ([]byte, error)
 }
 
 // JSONRPCStore defines all the methods required
@@ -72,6 +72,7 @@ type Config struct {
 	BatchLengthLimit         uint64
 	BlockRangeLimit          uint64
 	TxHandoff                string
+	LogTimings               bool
 }
 
 // NewJSONRPC returns the JSONRPC http server
@@ -330,7 +331,8 @@ func (j *JSONRPC) handleJSONRPCRequest(w http.ResponseWriter, req *http.Request)
 	// log request
 	j.logger.Debug("handle", "request", string(data))
 
-	resp, err := j.dispatcher.Handle(data)
+	timings := &timings{}
+	resp, err := j.dispatcher.Handle(data, timings)
 
 	if err != nil {
 		_, _ = w.Write([]byte(err.Error()))
@@ -338,6 +340,14 @@ func (j *JSONRPC) handleJSONRPCRequest(w http.ResponseWriter, req *http.Request)
 		_, _ = w.Write(resp)
 	}
 
+	if j.config.LogTimings {
+		t, err := timings.Output()
+		if err != nil {
+			j.logger.Error("handle", "timings", err.Error())
+		} else {
+			j.logger.Info(fmt.Sprintf("call_timings=%s", t))
+		}
+	}
 	j.logger.Debug("handle", "response", string(resp))
 }
 
@@ -362,4 +372,36 @@ func (j *JSONRPC) handleGetRequest(writer io.Writer) {
 	if _, err = writer.Write(resp); err != nil {
 		_, _ = writer.Write([]byte(err.Error()))
 	}
+}
+
+type timing struct {
+	Method   string
+	Duration time.Duration
+}
+
+type timings struct {
+	Timings []timing
+}
+
+func (t *timings) Output() (string, error) {
+	type output struct {
+		Method   string `json:"m"`
+		Duration string `json:"d"`
+	}
+
+	res := make([]output, 0, len(t.Timings))
+
+	for _, timing := range t.Timings {
+		res = append(res, output{
+			Method:   timing.Method,
+			Duration: timing.Duration.String(),
+		})
+	}
+
+	asJson, err := jsonit.Marshal(res)
+	if err != nil {
+		return "", err
+	}
+
+	return string(asJson), nil
 }

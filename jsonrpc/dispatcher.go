@@ -347,7 +347,7 @@ func (d *Dispatcher) handleSingleWs(req Request, conn wsConn) Response {
 	return NewRPCResponse(id, "2.0", response, err)
 }
 
-func (d *Dispatcher) Handle(reqBody []byte) ([]byte, error) {
+func (d *Dispatcher) Handle(reqBody []byte, timings *timings) ([]byte, error) {
 	x := bytes.TrimLeft(reqBody, " \t\r\n")
 	if len(x) == 0 {
 		return NewRPCResponse(nil, "2.0", nil, NewInvalidRequestError("Invalid json request")).Bytes()
@@ -363,7 +363,13 @@ func (d *Dispatcher) Handle(reqBody []byte) ([]byte, error) {
 			return NewRPCResponse(req.ID, "2.0", nil, NewInvalidRequestError("Invalid json request")).Bytes()
 		}
 
+		now := time.Now()
 		resp, err := d.handleReq(req)
+		taken := time.Since(now)
+		timings.Timings = append(timings.Timings, timing{
+			Method:   req.Method,
+			Duration: taken,
+		})
 
 		return NewRPCResponse(req.ID, "2.0", resp, err).Bytes()
 	}
@@ -391,7 +397,9 @@ func (d *Dispatcher) Handle(reqBody []byte) ([]byte, error) {
 
 	responses := make([]Response, 0)
 
+	var now time.Time
 	for _, req := range requests {
+		now = time.Now()
 		var response, err = d.handleReq(req)
 		if err != nil {
 			errorResponse := NewRPCResponse(req.ID, "2.0", response, err)
@@ -399,6 +407,11 @@ func (d *Dispatcher) Handle(reqBody []byte) ([]byte, error) {
 
 			continue
 		}
+		taken := time.Since(now)
+		timings.Timings = append(timings.Timings, timing{
+			Method:   req.Method,
+			Duration: taken,
+		})
 
 		resp := NewRPCResponse(req.ID, "2.0", response, nil)
 		responses = append(responses, resp)

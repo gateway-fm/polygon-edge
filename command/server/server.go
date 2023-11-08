@@ -215,6 +215,13 @@ func setFlags(cmd *cobra.Command) {
 			"that consider fromBlock/toBlock values (e.g. eth_getLogs), value of 0 disables it",
 	)
 
+	cmd.Flags().BoolVar(
+		&params.rawConfig.JSONRPCLogTimings,
+		jsonRPCLogTimingsFlag,
+		defaultConfig.JSONRPCLogTimings,
+		"enable logging of json-rpc request timings at INFO level",
+	)
+
 	cmd.Flags().StringVar(
 		&params.rawConfig.LogFilePath,
 		logFileLocationFlag,
