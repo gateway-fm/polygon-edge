@@ -138,7 +138,7 @@ func (c *checkpointManager) submitCheckpoint(latestHeader *types.Header, isEndOf
 	if lastCheckpointBlockNumber == 0 {
 		if c.forkBlock > 0 {
 			lastCheckpointBlockNumber = c.forkBlock
-			c.logger.Info("checkpoint manager updating last block to handle fork", "lastCheckpointBlockNumber", lastCheckpointBlockNumber, "forkBlock", c.forkBlock)
+			c.logger.Info("chkmgr: checkpoint manager updating last block to handle fork", "lastCheckpointBlockNumber", lastCheckpointBlockNumber, "forkBlock", c.forkBlock)
 		}
 	}
 
@@ -147,10 +147,6 @@ func (c *checkpointManager) submitCheckpoint(latestHeader *types.Header, isEndOf
 		// it would attempt sending an old checkpoint again so we just skip it
 		return nil
 	}
-
-	c.logger.Debug("submitCheckpoint invoked...",
-		"latest checkpoint block", lastCheckpointBlockNumber,
-		"checkpoint block", latestHeader.Number)
 
 	var (
 		checkpointManagerAddr = ethgo.Address(c.checkpointManagerAddr)
@@ -172,6 +168,11 @@ func (c *checkpointManager) submitCheckpoint(latestHeader *types.Header, isEndOf
 			return err
 		}
 	}
+
+	c.logger.Info("chkmgr: submitCheckpoint invoked...",
+		"latest checkpoint block", lastCheckpointBlockNumber,
+		"latest header", latestHeader.Number,
+		"initial block number", initialBlockNumber)
 
 	// detect any pending (previously failed) checkpoints and send them
 	for blockNumber := initialBlockNumber + 1; blockNumber <= latestHeader.Number; blockNumber++ {
@@ -201,6 +202,8 @@ func (c *checkpointManager) submitCheckpoint(latestHeader *types.Header, isEndOf
 			To:   &checkpointManagerAddr,
 			From: c.key.Address(),
 		}
+
+		c.logger.Info("chkmgr: submitting pending checkpoint...", "parent block", parentHeader.Number, "parent extra", parentExtra)
 
 		if err = c.encodeAndSendCheckpoint(txn, parentHeader, parentExtra, true); err != nil {
 			return err
@@ -232,7 +235,7 @@ func (c *checkpointManager) submitCheckpoint(latestHeader *types.Header, isEndOf
 // sends a transaction to the CheckpointManager rootchain contract
 func (c *checkpointManager) encodeAndSendCheckpoint(txn *ethgo.Transaction,
 	header *types.Header, extra *Extra, isEndOfEpoch bool) error {
-	c.logger.Debug("send checkpoint txn...", "block number", header.Number)
+	c.logger.Info("chkmgr: send checkpoint txn...", "block number", header.Number)
 
 	nextEpochValidators := validator.AccountSet{}
 
@@ -244,6 +247,8 @@ func (c *checkpointManager) encodeAndSendCheckpoint(txn *ethgo.Transaction,
 			return err
 		}
 	}
+
+	c.logger.Info("chkmgr: found next epoch validators", "validators", nextEpochValidators)
 
 	input, err := c.abiEncodeCheckpointBlock(header.Number, header.Hash, extra, nextEpochValidators)
 	if err != nil {
@@ -263,7 +268,7 @@ func (c *checkpointManager) encodeAndSendCheckpoint(txn *ethgo.Transaction,
 
 	// update checkpoint block number metrics
 	metrics.SetGauge([]string{"bridge", "checkpoint_block_number"}, float32(header.Number))
-	c.logger.Debug("send checkpoint txn success", "block number", header.Number, "gasUsed", receipt.GasUsed)
+	c.logger.Info("chkmgr: send checkpoint txn success", "block number", header.Number, "gasUsed", receipt.GasUsed)
 
 	return nil
 }
@@ -356,7 +361,7 @@ func (c *checkpointManager) PostBlock(req *PostBlockRequest) error {
 		c.logger.Info("sending checkpoint to rootchain")
 		go func(header *types.Header, epochNumber uint64) {
 			if err := c.submitCheckpoint(header, req.IsEpochEndingBlock); err != nil {
-				c.logger.Warn("failed to submit checkpoint",
+				c.logger.Warn("chkmgr: failed to submit checkpoint",
 					"checkpoint block", header.Number,
 					"epoch number", epochNumber,
 					"error", err)

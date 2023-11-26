@@ -115,7 +115,7 @@ func (v *validatorsSnapshotCache) GetSnapshot(
 
 	deltasCount := 0
 
-	v.logger.Trace("Applying deltas started...", "LatestSnapshotEpoch", latestValidatorSnapshot.Epoch)
+	v.logger.Info("Applying deltas started...", "LatestSnapshotEpoch", latestValidatorSnapshot.Epoch)
 
 	// Create the snapshot for the desired block (epoch) by incrementally applying deltas to the latest stored snapshot
 	for latestValidatorSnapshot.Epoch < epochToGetSnapshot {
@@ -140,7 +140,7 @@ func (v *validatorsSnapshotCache) GetSnapshot(
 		deltasCount++
 	}
 
-	v.logger.Trace(
+	v.logger.Info(
 		fmt.Sprintf("Applied %d delta(s) to the validators snapshot", deltasCount),
 		"Epoch", latestValidatorSnapshot.Epoch,
 	)
