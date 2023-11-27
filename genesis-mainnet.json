@@ -133,7 +133,7 @@
           "stakeTokenAddr": "0x7D1AfA7B718fb893dB30A3aBc0Cfc608AaCfeBB0",
           "blsAddr": "0xD48Adf16DD37e0aA48A1FFa391bAf4F603fc0B3e",
           "bn256G2Addr": "0x40EeC6136C1F3604D4faED7022e4341B8e717978",
-          "jsonRPCEndpoint": "https://mainnet.infura.io/v3/bd3e876fe4a84781b2199d4a68a795f1",
+          "jsonRPCEndpoint": "https://rpc.eu-central-1.gateway.fm/v4/ethereum/non-archival/mainnet",
           "eventTrackerStartBlocks": {
             "0x1546b9c9cb0d20FD123756df746346fd7d8e9DE3": 18469904
           }

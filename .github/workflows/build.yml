@@ -49,6 +49,7 @@ jobs:
           file: Dockerfile.mainnet
           build-args: |
             "VERSION=${{ steps.tag_version.outputs.new_tag }}"
+            "APIKEY=${{ secrets.PALM_MAINNET_APIKEY }}"
           tags: |
             gatewayfm/polygon-edge:mainnet-latest
             gatewayfm/polygon-edge:mainnet-${{ steps.tag_version.outputs.new_tag }}
