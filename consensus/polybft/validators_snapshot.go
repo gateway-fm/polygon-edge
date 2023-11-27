@@ -83,14 +83,15 @@ func (v *validatorsSnapshotCache) GetSnapshot(
 		epochToGetSnapshot--
 	}
 
-	v.logger.Trace("Retrieving snapshot started...", "Block", blockNumber, "Epoch", epochToGetSnapshot)
+	v.logger.Debug("vals: Retrieving snapshot started...", "Block", blockNumber, "Epoch", epochToGetSnapshot)
 
-	latestValidatorSnapshot, err := v.getLastCachedSnapshot(epochToGetSnapshot)
+	latestValidatorSnapshot, err := v.getLastSnapshot(epochToGetSnapshot)
 	if err != nil {
 		return nil, err
 	}
 
 	if latestValidatorSnapshot != nil && latestValidatorSnapshot.Epoch == epochToGetSnapshot {
+		v.logger.Debug("vals: latest validator snapshot matches epoch", "epoch", epochToGetSnapshot)
 		// we have snapshot for required block (epoch) in cache
 		return latestValidatorSnapshot.Snapshot, nil
 	}
@@ -110,12 +111,14 @@ func (v *validatorsSnapshotCache) GetSnapshot(
 
 		latestValidatorSnapshot = genesisBlockSnapshot
 
-		v.logger.Trace("Built validators snapshot for genesis block")
+		v.logger.Info("vals: built validators snapshot for genesis block")
 	}
 
 	deltasCount := 0
 
-	v.logger.Info("Applying deltas started...", "LatestSnapshotEpoch", latestValidatorSnapshot.Epoch)
+	v.logger.Info("vals: Applying deltas started...",
+		"LatestSnapshotEpoch", latestValidatorSnapshot.Epoch,
+		"epochToGetSnapshot", epochToGetSnapshot)
 
 	// Create the snapshot for the desired block (epoch) by incrementally applying deltas to the latest stored snapshot
 	for latestValidatorSnapshot.Epoch < epochToGetSnapshot {
@@ -125,7 +128,7 @@ func (v *validatorsSnapshotCache) GetSnapshot(
 				latestValidatorSnapshot.Epoch+1, err)
 		}
 
-		v.logger.Trace("Applying delta", "epochEndBlock", nextEpochEndBlockNumber)
+		v.logger.Debug("vals: Applying delta", "epochEndBlock", nextEpochEndBlockNumber)
 
 		intermediateSnapshot, err := v.computeSnapshot(latestValidatorSnapshot, nextEpochEndBlockNumber, parents)
 		if err != nil {
@@ -141,8 +144,9 @@ func (v *validatorsSnapshotCache) GetSnapshot(
 	}
 
 	v.logger.Info(
-		fmt.Sprintf("Applied %d delta(s) to the validators snapshot", deltasCount),
+		fmt.Sprintf("vals: Applied %d delta(s) to the validators snapshot", deltasCount),
 		"Epoch", latestValidatorSnapshot.Epoch,
+		"snapshot", latestValidatorSnapshot.Snapshot,
 	)
 
 	if err := v.cleanup(); err != nil {
@@ -262,24 +266,49 @@ func (v *validatorsSnapshotCache) cleanup() error {
 	return nil
 }
 
-// getLastCachedSnapshot gets the latest snapshot cached
-// If it doesn't have snapshot cached for desired epoch, it will return the latest one it has
-func (v *validatorsSnapshotCache) getLastCachedSnapshot(currentEpoch uint64) (*validatorSnapshot, error) {
-	cachedSnapshot := v.snapshots[currentEpoch]
-	if cachedSnapshot != nil {
-		return cachedSnapshot, nil
+// getLastSnapshot gets the latest snapshot from cache or db based on the passed epoch number
+func (v *validatorsSnapshotCache) getLastSnapshot(epoch uint64) (*validatorSnapshot, error) {
+	snapshot := v.snapshots[epoch]
+	if snapshot != nil {
+		v.logger.Debug("vals: found cached snapshot immediately", "epoch", epoch)
+		return snapshot, nil
+	}
+
+	// now try the DB to see if the snapshot is there
+	snapshot, err := v.state.EpochStore.getValidatorSnapshot(epoch)
+	if err != nil {
+		// log the error and move on
+		v.logger.Error("vals: failed to get snapshot from db", "epoch", epoch, "err", err)
+	}
+	if snapshot != nil {
+		v.logger.Info("vals: found snapshot in db immediately - adding to cache", "epoch", epoch)
+		// store this epoch in the cache for later
+		v.snapshots[epoch] = snapshot.copy()
+		return snapshot, nil
 	}
 
 	// if we do not have a snapshot in memory for given epoch, we will get the latest one we have
-	for ; currentEpoch >= 0; currentEpoch-- {
-		cachedSnapshot = v.snapshots[currentEpoch]
-		if cachedSnapshot != nil {
-			v.logger.Trace("Found snapshot in memory cache", "Epoch", currentEpoch)
-
+	for ; epoch >= 0; epoch-- {
+		snapshot = v.snapshots[epoch]
+		if snapshot != nil {
+			v.logger.Debug("vals: found snapshot in memory cache", "epoch", epoch)
 			break
 		}
 
-		if currentEpoch == 0 { // prevent uint64 underflow
+		// check the db also for this snapshot
+		snapshot, err = v.state.EpochStore.getValidatorSnapshot(epoch)
+		if err != nil {
+			// log the error and move on
+			v.logger.Error("vals: failed to get snapshot from db", "epoch", epoch, "err", err)
+		}
+		if snapshot != nil {
+			v.logger.Info("vals: found snapshot in db - adding to cache", "epoch", epoch)
+			// store this epoch in the cache for later
+			v.snapshots[epoch] = snapshot.copy()
+			break
+		}
+
+		if epoch == 0 { // prevent uint64 underflow
 			break
 		}
 	}
@@ -292,14 +321,14 @@ func (v *validatorsSnapshotCache) getLastCachedSnapshot(currentEpoch uint64) (*v
 	if dbSnapshot != nil {
 		// if we do not have any snapshot in memory, or db snapshot is newer than the one in memory
 		// return the one from db
-		if cachedSnapshot == nil || dbSnapshot.Epoch > cachedSnapshot.Epoch {
-			cachedSnapshot = dbSnapshot
+		if snapshot == nil || dbSnapshot.Epoch > snapshot.Epoch {
+			snapshot = dbSnapshot
 			// save it in cache as well, since it doesn't exist
 			v.snapshots[dbSnapshot.Epoch] = dbSnapshot.copy()
 		}
 	}
 
-	return cachedSnapshot, nil
+	return snapshot, nil
 }
 
 // getNextEpochEndingBlock gets the epoch ending block of a newer epoch

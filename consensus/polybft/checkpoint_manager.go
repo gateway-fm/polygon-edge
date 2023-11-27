@@ -248,7 +248,7 @@ func (c *checkpointManager) encodeAndSendCheckpoint(txn *ethgo.Transaction,
 		}
 	}
 
-	c.logger.Info("chkmgr: found next epoch validators", "validators", nextEpochValidators)
+	c.logger.Info("chkmgr: found next epoch validators", "block", header.Number, "validators", nextEpochValidators)
 
 	input, err := c.abiEncodeCheckpointBlock(header.Number, header.Hash, extra, nextEpochValidators)
 	if err != nil {
