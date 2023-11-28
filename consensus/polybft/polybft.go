@@ -70,6 +70,11 @@ func Factory(params *consensus.Params) (consensus.Consensus, error) {
 		return nil, err
 	}
 
+	if len(params.BlockTrackerEndpoint) > 0 {
+		polybft.consensusConfig.Bridge.JSONRPCEndpoint = params.BlockTrackerEndpoint
+
+	}
+
 	return polybft, nil
 }
 

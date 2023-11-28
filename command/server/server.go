@@ -236,6 +236,13 @@ func setFlags(cmd *cobra.Command) {
 		"start the state sync relayer service (PolyBFT only)",
 	)
 
+	cmd.Flags().StringVar(
+		&params.rawConfig.BlockTrackerEndpoint,
+		blockTrackerEndpoint,
+		defaultConfig.BlockTrackerEndpoint,
+		"the JSON RPC endpoint for the block tracker service",
+	)
+
 	cmd.Flags().Uint64Var(
 		&params.rawConfig.NumBlockConfirmations,
 		numBlockConfirmationsFlag,

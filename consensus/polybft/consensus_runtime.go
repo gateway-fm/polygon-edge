@@ -84,6 +84,7 @@ type runtimeConfig struct {
 	forkBlock             uint64
 	isPalm                bool
 	isRelayer             bool
+	blockTrackerEndpoint  string
 }
 
 // consensusRuntime is a struct that provides consensus runtime features like epoch, state and event management

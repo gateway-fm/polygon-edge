@@ -43,6 +43,9 @@ const (
 
 	relayerFlag               = "relayer"
 	numBlockConfirmationsFlag = "num-block-confirmations"
+
+	// used to override the jsonRPCEndpoint value in genesis
+	blockTrackerEndpoint = "block-tracker-endpoint"
 )
 
 // Flags that are deprecated, but need to be preserved for
@@ -188,5 +191,6 @@ func (p *serverParams) generateConfig() *server.Config {
 
 		Relayer:               p.relayer,
 		NumBlockConfirmations: p.rawConfig.NumBlockConfirmations,
+		BlockTrackerEndpoint:  p.rawConfig.BlockTrackerEndpoint,
 	}
 }

@@ -690,6 +690,7 @@ func (s *Server) setupConsensus(
 			NumBlockConfirmations: s.config.NumBlockConfirmations,
 			FromForked:            fromForked,
 			IsRelayer:             s.isRelayer,
+			BlockTrackerEndpoint:  s.config.BlockTrackerEndpoint,
 		},
 	)
 

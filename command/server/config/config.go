@@ -36,6 +36,7 @@ type Config struct {
 
 	Relayer               bool   `json:"relayer" yaml:"relayer"`
 	NumBlockConfirmations uint64 `json:"num_block_confirmations" yaml:"num_block_confirmations"`
+	BlockTrackerEndpoint  string `json:"block_tracker_endpoint" yaml:"block_tracker_endpoint"`
 }
 
 // Telemetry holds the config details for metric services.
@@ -125,6 +126,7 @@ func DefaultConfig() *Config {
 		JSONRPCLogTimings:        false,
 		Relayer:                  false,
 		NumBlockConfirmations:    DefaultNumBlockConfirmations,
+		BlockTrackerEndpoint:     "",
 	}
 }
 
