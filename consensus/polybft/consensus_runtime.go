@@ -263,6 +263,7 @@ func (c *consensusRuntime) getGuardedData() (guardedDataDTO, error) {
 	proposerSnapshot, ok := c.proposerCalculator.GetSnapshot()
 
 	if !ok {
+		c.logger.Info("No proposer calculator snapshot present")
 		return guardedDataDTO{}, errors.New("cannot collect shared data, snapshot is empty")
 	}
 
@@ -766,7 +767,7 @@ func (c *consensusRuntime) IsValidCommittedSeal(proposalHash []byte, committedSe
 func (c *consensusRuntime) BuildProposal(view *proto.View) []byte {
 	sharedData, err := c.getGuardedData()
 	if err != nil {
-		c.logger.Error("unable to build proposal", "error", err)
+		c.logger.Error("unable to build proposal, shared data", "error", err)
 
 		return nil
 	}
@@ -780,7 +781,7 @@ func (c *consensusRuntime) BuildProposal(view *proto.View) []byte {
 
 	proposal, err := c.fsm.BuildProposal(view.Round)
 	if err != nil {
-		c.logger.Error("unable to build proposal", "blockNumber", view, "error", err)
+		c.logger.Error("unable to build proposal, fsm", "blockNumber", view, "error", err)
 
 		return nil
 	}
