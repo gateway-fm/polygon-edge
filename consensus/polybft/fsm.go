@@ -194,14 +194,16 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 		return nil, err
 	}
 
-	if f.logger.IsDebug() {
+	if f.logger.IsInfo() {
 		checkpointHash, err := extra.Checkpoint.Hash(f.backend.GetChainID(), f.Height(), stateBlock.Block.Hash())
 		if err != nil {
 			return nil, fmt.Errorf("failed to calculate proposal hash: %w", err)
 		}
 
 		f.logger.Debug("[FSM Build Proposal]",
+			"block", stateBlock.Block.Number(),
 			"txs", len(stateBlock.Block.Transactions),
+			"elapsed time", time.Now().UTC().Sub(start).Seconds(),
 			"proposal hash", checkpointHash.String())
 	}
 
@@ -294,6 +296,7 @@ func (f *fsm) ValidateCommit(signer []byte, seal []byte, proposalHash []byte) er
 
 // Validate validates a raw proposal (used if non-proposer)
 func (f *fsm) Validate(proposal []byte) error {
+	start := time.Now().UTC()
 	var block types.Block
 	if err := block.UnmarshalRLP(proposal); err != nil {
 		return fmt.Errorf("failed to validate, cannot decode block data. Error: %w", err)
@@ -377,13 +380,17 @@ func (f *fsm) Validate(proposal []byte) error {
 		return err
 	}
 
-	if f.logger.IsDebug() {
+	if f.logger.IsInfo() {
 		checkpointHash, err := extra.Checkpoint.Hash(f.backend.GetChainID(), block.Number(), block.Hash())
 		if err != nil {
 			return fmt.Errorf("failed to calculate proposal hash: %w", err)
 		}
 
-		f.logger.Debug("[FSM Validate]", "block", stateBlock.Block.Number(), "txs", len(block.Transactions), "proposal hash", checkpointHash)
+		f.logger.Info("[FSM Validate]",
+			"block", stateBlock.Block.Number(),
+			"txs", len(block.Transactions),
+			"elapsed time", time.Now().UTC().Sub(start).Seconds(),
+			"proposal hash", checkpointHash)
 	}
 
 	f.target = stateBlock

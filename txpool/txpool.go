@@ -897,8 +897,9 @@ func (p *TxPool) handlePromoteRequest(req promoteRequest) {
 
 	// promote enqueued txs
 	promoted, pruned := account.promote()
-	if p.logger.IsDebug() {
-		p.logger.Debug("promote request", "promoted", promoted, "addr", addr.String())
+	if p.logger.IsTrace() {
+		promotedTxsJSON, _ := json.Marshal(promoted)
+		p.logger.Trace("promote request", "promoted", string(promotedTxsJSON), "addr", addr.String())
 	}
 
 	p.removeFromIndex(pruned...)
