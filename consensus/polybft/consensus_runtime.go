@@ -682,6 +682,9 @@ func (c *consensusRuntime) getSystemState(header *types.Header) (SystemState, er
 }
 
 func (c *consensusRuntime) IsValidProposal(rawProposal []byte) bool {
+	c.logger.Info("[IsValidProposal] Begin", "height", c.fsm.Height())
+	defer c.logger.Info("[IsValidProposal] End", "height", c.fsm.Height())
+
 	if err := c.fsm.Validate(rawProposal); err != nil {
 		c.logger.Error("failed to validate proposal", "error", err)
 
@@ -692,6 +695,9 @@ func (c *consensusRuntime) IsValidProposal(rawProposal []byte) bool {
 }
 
 func (c *consensusRuntime) IsValidValidator(msg *proto.Message) bool {
+	c.logger.Info("[IsValidValidator] Begin", "height", msg.View.Height, "round", msg.View.Round)
+	defer c.logger.Info("[IsValidValidator] End", "height", msg.View.Height, "round", msg.View.Round)
+
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
@@ -711,6 +717,9 @@ func (c *consensusRuntime) IsValidValidator(msg *proto.Message) bool {
 }
 
 func (c *consensusRuntime) IsProposer(id []byte, height, round uint64) bool {
+	c.logger.Info("[IsProposer] Begin", "height", height, "round", round)
+	defer c.logger.Info("[IsProposer] End", "height", height, "round", round)
+
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
@@ -727,6 +736,13 @@ func (c *consensusRuntime) IsProposer(id []byte, height, round uint64) bool {
 }
 
 func (c *consensusRuntime) IsValidProposalHash(proposal *proto.Proposal, hash []byte) bool {
+	height := uint64(0)
+	if c.fsm != nil {
+		height = c.fsm.Height()
+	}
+	c.logger.Info("[IsValidProposalHash] Begin", "height", height)
+	defer c.logger.Info("[IsValidProposalHash] End", "height", height)
+
 	if len(proposal.RawProposal) == 0 {
 		c.logger.Error("proposal hash is not valid because proposal is empty")
 
@@ -758,6 +774,10 @@ func (c *consensusRuntime) IsValidProposalHash(proposal *proto.Proposal, hash []
 }
 
 func (c *consensusRuntime) IsValidCommittedSeal(proposalHash []byte, committedSeal *messages.CommittedSeal) bool {
+	height := c.fsm.Height()
+	c.logger.Info("[IsValidCommittedSeal] Begin", "height", height)
+	defer c.logger.Info("[IsValidCommittedSeal] End", "height", height)
+
 	err := c.fsm.ValidateCommit(committedSeal.Signer, committedSeal.Signature, proposalHash)
 	if err != nil {
 		c.logger.Info("Invalid committed seal", "error", err)
@@ -769,6 +789,9 @@ func (c *consensusRuntime) IsValidCommittedSeal(proposalHash []byte, committedSe
 }
 
 func (c *consensusRuntime) BuildProposal(view *proto.View) []byte {
+	c.logger.Info("[BuildProposal] Begin", "height", view.Height, "round", view.Round)
+	defer c.logger.Info("[BuildProposal] End", "height", view.Height, "round", view.Round)
+
 	sharedData, err := c.getGuardedData()
 	if err != nil {
 		c.logger.Error("unable to build proposal, shared data", "error", err)
@@ -797,6 +820,9 @@ func (c *consensusRuntime) BuildProposal(view *proto.View) []byte {
 func (c *consensusRuntime) InsertProposal(proposal *proto.Proposal, committedSeals []*messages.CommittedSeal) {
 	fsm := c.fsm
 
+	c.logger.Info("[InsertProposal] Begin", "height", fsm.Height())
+	defer c.logger.Info("[InsertProposal] End", "height", fsm.Height())
+
 	fullBlock, err := fsm.Insert(proposal.RawProposal, committedSeals)
 	if err != nil {
 		c.logger.Error("cannot insert proposal", "error", err)
@@ -816,6 +842,9 @@ func (c *consensusRuntime) ID() []byte {
 func (c *consensusRuntime) GetVotingPowers(height uint64) (map[string]*big.Int, error) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
+
+	c.logger.Info("[GetVotingPowers] Begin", "height", height)
+	defer c.logger.Info("[GetVotingPowers] End", "height", height)
 
 	if c.fsm == nil {
 		return nil, errors.New("getting voting power failed - backend is not initialized")
