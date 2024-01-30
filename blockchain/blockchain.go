@@ -888,11 +888,13 @@ func (b *Blockchain) WriteFullBlock(fblock *types.FullBlock, source string) erro
 		"hash", header.Hash,
 		"parent", header.ParentHash,
 		"source", source,
+		"gas used", header.GasUsed,
+		"gas limit", header.GasLimit,
 	}
 
 	if prevHeader, ok := b.GetHeaderByNumber(header.Number - 1); ok {
 		diff := header.Timestamp - prevHeader.Timestamp
-		logArgs = append(logArgs, "generation_time_in_seconds", diff)
+		logArgs = append(logArgs, "generation time [s]", diff)
 	}
 
 	b.logger.Info("new block", logArgs...)
