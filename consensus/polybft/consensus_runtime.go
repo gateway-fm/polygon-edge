@@ -682,8 +682,9 @@ func (c *consensusRuntime) getSystemState(header *types.Header) (SystemState, er
 }
 
 func (c *consensusRuntime) IsValidProposal(rawProposal []byte) bool {
-	c.logger.Info("[IsValidProposal] Begin", "height", c.fsm.Height())
-	defer c.logger.Info("[IsValidProposal] End", "height", c.fsm.Height())
+	height := c.getFSMHeight()
+	c.logger.Info("[IsValidProposal] Begin", "height", height)
+	defer c.logger.Info("[IsValidProposal] End", "height", height)
 
 	if err := c.fsm.Validate(rawProposal); err != nil {
 		c.logger.Error("failed to validate proposal", "error", err)
@@ -736,10 +737,7 @@ func (c *consensusRuntime) IsProposer(id []byte, height, round uint64) bool {
 }
 
 func (c *consensusRuntime) IsValidProposalHash(proposal *proto.Proposal, hash []byte) bool {
-	height := uint64(0)
-	if c.fsm != nil {
-		height = c.fsm.Height()
-	}
+	height := c.getFSMHeight()
 	c.logger.Info("[IsValidProposalHash] Begin", "height", height)
 	defer c.logger.Info("[IsValidProposalHash] End", "height", height)
 
@@ -774,7 +772,7 @@ func (c *consensusRuntime) IsValidProposalHash(proposal *proto.Proposal, hash []
 }
 
 func (c *consensusRuntime) IsValidCommittedSeal(proposalHash []byte, committedSeal *messages.CommittedSeal) bool {
-	height := c.fsm.Height()
+	height := c.getFSMHeight()
 	c.logger.Info("[IsValidCommittedSeal] Begin", "height", height)
 	defer c.logger.Info("[IsValidCommittedSeal] End", "height", height)
 
@@ -820,8 +818,9 @@ func (c *consensusRuntime) BuildProposal(view *proto.View) []byte {
 func (c *consensusRuntime) InsertProposal(proposal *proto.Proposal, committedSeals []*messages.CommittedSeal) {
 	fsm := c.fsm
 
-	c.logger.Info("[InsertProposal] Begin", "height", fsm.Height())
-	defer c.logger.Info("[InsertProposal] End", "height", fsm.Height())
+	height := c.getFSMHeight()
+	c.logger.Info("[InsertProposal] Begin", "height", height)
+	defer c.logger.Info("[InsertProposal] End", "height", height)
 
 	fullBlock, err := fsm.Insert(proposal.RawProposal, committedSeals)
 	if err != nil {
@@ -1059,4 +1058,11 @@ func getSealersForBlock(sealersCounter map[types.Address]uint64,
 	}
 
 	return nil
+}
+
+func (c *consensusRuntime) getFSMHeight() uint64 {
+	c.lock.RLock()
+	defer c.lock.RUnlock()
+
+	return c.fsm.Height()
 }
