@@ -342,6 +342,10 @@ func (c *consensusRuntime) OnBlockInserted(fullBlock *types.FullBlock) {
 	// finally update runtime state (lastBuiltBlock, epoch, proposerSnapshot)
 	c.epoch = epoch
 	c.lastBuiltBlock = fullBlock.Block.Header
+
+	c.logger.Info("OnBlockInserted finished",
+		"block", fullBlock.Block.Number(),
+		"epoch", epoch.Number)
 }
 
 // FSM creates a new instance of fsm
