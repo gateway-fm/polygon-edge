@@ -439,7 +439,8 @@ func (m *Server) build(
 				ChainID:            big.NewInt(m.config.Chain.Params.ChainID),
 				DataDir:            m.config.DataDir,
 			},
-			m.txpoolStorage,
+			nil,
+			//m.txpoolStorage, // disabled for now
 		)
 		if err != nil {
 			return nil, err
