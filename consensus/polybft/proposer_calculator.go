@@ -168,12 +168,23 @@ func NewProposerCalculator(config *runtimeConfig, logger hclog.Logger) (*Propose
 		return nil, err
 	}
 
-	return &ProposerCalculator{
+	pc := &ProposerCalculator{
 		snapshot: snap,
 		config:   config,
 		state:    config.State,
 		logger:   logger,
-	}, nil
+	}
+
+	// If the node was previously stopped, leaving the proposer calculator in an inconsistent state,
+	// proposer calculator needs to be updated.
+	blockNumber := config.blockchain.CurrentHeader().Number
+	if pc.snapshot.Height <= blockNumber {
+		if err = pc.update(blockNumber); err != nil {
+			return nil, err
+		}
+	}
+
+	return pc, nil
 }
 
 // NewProposerCalculator creates a new proposer calculator object
@@ -196,10 +207,7 @@ func (pc *ProposerCalculator) GetSnapshot() (*ProposerSnapshot, bool) {
 	return pc.snapshot.Copy(), true
 }
 
-// PostBlock is called on every insert of finalized block (either from consensus or syncer)
-// It will update priorities and save the updated snapshot to db
-func (pc *ProposerCalculator) PostBlock(req *PostBlockRequest) error {
-	blockNumber := req.FullBlock.Block.Number()
+func (pc *ProposerCalculator) update(blockNumber uint64) error {
 	pc.logger.Debug("Update proposers snapshot started", "target block", blockNumber)
 
 	from := pc.snapshot.Height
@@ -223,6 +231,14 @@ func (pc *ProposerCalculator) PostBlock(req *PostBlockRequest) error {
 	pc.logger.Debug("Update proposers snapshot finished", "target block", blockNumber)
 
 	return nil
+}
+
+// PostBlock is called on every insert of finalized block (either from consensus or syncer)
+// It will update priorities and save the updated snapshot to db
+func (pc *ProposerCalculator) PostBlock(req *PostBlockRequest) error {
+	blockNumber := req.FullBlock.Block.Number()
+
+	return pc.update(blockNumber)
 }
 
 // Updates ProposerSnapshot to block block with number `blockNumber`
