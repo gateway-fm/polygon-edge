@@ -576,6 +576,7 @@ func (p *Polybft) startConsensusProtocol() {
 	defer newBlockSub.Close()
 
 	syncerBlockCh := make(chan struct{})
+	consensusBlockCh := make(chan struct{})
 
 	var runningSequence uint64 = 0
 
@@ -590,18 +591,18 @@ func (p *Polybft) startConsensusProtocol() {
 				// The blockchain notification system can eventually deliver
 				// stale block notifications. These should be ignored
 				if ev.Source == "syncer" && ev.NewChain[0].Number >= p.blockchain.CurrentHeader().Number {
-					p.logger.Info("sync block notification received", "block height", ev.NewChain[0].Number,
+					p.logger.Info("sync block notification received from syncer", "block height", ev.NewChain[0].Number,
 						"current height", p.blockchain.CurrentHeader().Number)
 					syncerBlockCh <- struct{}{}
 				}
 
 				// if we have a sequence being run and the new event has a higher block number than this sequence
 				// then we need to terminate the sequence early
-				if runningSequence > 0 && ev.Source == "consensus" && ev.NewChain[0].Number > runningSequence {
-					p.logger.Info("sync block notification received from consensus higher than running sequence", "block height", ev.NewChain[0].Number,
+				if runningSequence > 0 && ev.Source == "consensus" && ev.NewChain[0].Number >= runningSequence {
+					p.logger.Info("consensus block event", "block height", ev.NewChain[0].Number,
 						"current height", p.blockchain.CurrentHeader().Number,
 						"sequence", runningSequence)
-					syncerBlockCh <- struct{}{}
+					consensusBlockCh <- struct{}{}
 				}
 			}
 		}
@@ -648,6 +649,7 @@ func (p *Polybft) startConsensusProtocol() {
 				stopSequence()
 				p.logger.Info("canceled sequence", "sequence", latestHeader.Number+1)
 			}
+		case <-consensusBlockCh:
 		case <-sequenceCh:
 		case <-p.closeCh:
 			if isValidator {
