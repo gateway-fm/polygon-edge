@@ -372,8 +372,8 @@ func GenesisPostHookFactory(config *chain.Chain, engineName string) func(txn *st
 
 			// initialize EIP1559Burn SC
 			if config.Params.BurnContract != nil &&
-				len(config.Params.BurnContract) == 1 &&
-				!polyBFTConfig.NativeTokenConfig.IsMintable {
+			    len(config.Params.BurnContract) == 1 &&
+			    !polyBFTConfig.NativeTokenConfig.IsMintable {
 				var contractAddress types.Address
 				for _, address := range config.Params.BurnContract {
 					contractAddress = address
@@ -577,6 +577,8 @@ func (p *Polybft) startConsensusProtocol() {
 
 	syncerBlockCh := make(chan struct{})
 
+	var runningSequence uint64 = 0
+
 	go func() {
 		eventCh := newBlockSub.GetEventCh()
 
@@ -590,6 +592,15 @@ func (p *Polybft) startConsensusProtocol() {
 				if ev.Source == "syncer" && ev.NewChain[0].Number >= p.blockchain.CurrentHeader().Number {
 					p.logger.Info("sync block notification received", "block height", ev.NewChain[0].Number,
 						"current height", p.blockchain.CurrentHeader().Number)
+					syncerBlockCh <- struct{}{}
+				}
+
+				// if we have a sequence being run and the new event has a higher block number than this sequence
+				// then we need to terminate the sequence early
+				if runningSequence > 0 && ev.Source == "consensus" && ev.NewChain[0].Number > runningSequence {
+					p.logger.Info("sync block notification received from consensus higher than running sequence", "block height", ev.NewChain[0].Number,
+						"current height", p.blockchain.CurrentHeader().Number,
+						"sequence", runningSequence)
 					syncerBlockCh <- struct{}{}
 				}
 			}
@@ -624,7 +635,9 @@ func (p *Polybft) startConsensusProtocol() {
 				continue
 			}
 
-			sequenceCh, stopSequence = p.ibft.runSequence(latestHeader.Number + 1)
+			runningSequence = latestHeader.Number + 1
+
+			sequenceCh, stopSequence = p.ibft.runSequence(runningSequence)
 		}
 
 		now := time.Now().UTC()
