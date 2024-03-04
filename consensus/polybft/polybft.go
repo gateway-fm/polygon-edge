@@ -576,9 +576,6 @@ func (p *Polybft) startConsensusProtocol() {
 	defer newBlockSub.Close()
 
 	syncerBlockCh := make(chan struct{})
-	consensusBlockCh := make(chan struct{})
-
-	var runningSequence uint64 = 0
 
 	go func() {
 		eventCh := newBlockSub.GetEventCh()
@@ -595,15 +592,6 @@ func (p *Polybft) startConsensusProtocol() {
 						"current height", p.blockchain.CurrentHeader().Number)
 					syncerBlockCh <- struct{}{}
 				}
-
-				// if we have a sequence being run and the new event has a higher block number than this sequence
-				// then we need to terminate the sequence early
-				if runningSequence > 0 && ev.Source == "consensus" && ev.NewChain[0].Number >= runningSequence {
-					p.logger.Info("consensus block event", "block height", ev.NewChain[0].Number,
-						"current height", p.blockchain.CurrentHeader().Number,
-						"sequence", runningSequence)
-					consensusBlockCh <- struct{}{}
-				}
 			}
 		}
 	}()
@@ -614,6 +602,9 @@ func (p *Polybft) startConsensusProtocol() {
 	)
 
 	for {
+		// check 2 seconds above block time so we don't artificially close a sequence before the actual sequence has ended properly
+		checkDuration := time.Duration(p.config.BlockTime + 2)
+		staleChecker := newStaleSequenceCheck(p.logger, p.blockchain.CurrentHeader, checkDuration*time.Second)
 		latestHeader := p.blockchain.CurrentHeader()
 
 		currentValidators, err := p.GetValidators(latestHeader.Number, nil)
@@ -636,9 +627,10 @@ func (p *Polybft) startConsensusProtocol() {
 				continue
 			}
 
-			runningSequence = latestHeader.Number + 1
-
+			runningSequence := latestHeader.Number + 1
 			sequenceCh, stopSequence = p.ibft.runSequence(runningSequence)
+			staleChecker.setSequence(runningSequence)
+			staleChecker.startChecking()
 		}
 
 		now := time.Now().UTC()
@@ -647,16 +639,24 @@ func (p *Polybft) startConsensusProtocol() {
 		case <-syncerBlockCh:
 			if isValidator {
 				stopSequence()
-				p.logger.Info("canceled sequence", "sequence", latestHeader.Number+1)
+				p.logger.Info("canceled sequence via syncer", "sequence", latestHeader.Number+1)
 			}
-		case <-consensusBlockCh:
+		case <-staleChecker.sequenceShouldStop:
+			if isValidator {
+				stopSequence()
+				p.logger.Info("canceled sequence via stale checker", "sequence", latestHeader.Number+1)
+			}
 		case <-sequenceCh:
 		case <-p.closeCh:
 			if isValidator {
 				stopSequence()
+				staleChecker.stopChecking()
 			}
-
 			return
+		}
+
+		if isValidator {
+			staleChecker.stopChecking()
 		}
 
 		p.logger.Debug("time to run the sequence", "seconds", time.Since(now))
