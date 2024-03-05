@@ -601,10 +601,11 @@ func (p *Polybft) startConsensusProtocol() {
 		stopSequence func()
 	)
 
+	// check 2 seconds above block time, so we don't artificially close a sequence before the actual sequence has ended properly
+	checkDuration := time.Duration(p.config.BlockTime + 2)
+	staleChecker := newStaleSequenceCheck(p.logger, p.blockchain.CurrentHeader, checkDuration*time.Second)
+
 	for {
-		// check 2 seconds above block time so we don't artificially close a sequence before the actual sequence has ended properly
-		checkDuration := time.Duration(p.config.BlockTime + 2)
-		staleChecker := newStaleSequenceCheck(p.logger, p.blockchain.CurrentHeader, checkDuration*time.Second)
 		latestHeader := p.blockchain.CurrentHeader()
 
 		currentValidators, err := p.GetValidators(latestHeader.Number, nil)

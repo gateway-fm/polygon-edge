@@ -36,13 +36,14 @@ func Test_sequenceStaleCheck(t *testing.T) {
 			state <- 1
 			return
 		case <-staleCheck.sequenceShouldStop:
-			staleCheck.stopChecking()
 			state <- 2
 			return
 		}
 	}()
 
 	result := <-state
+
+	staleCheck.stopChecking()
 
 	if result == 1 {
 		t.Fatal("test timed out waiting for condition")
