@@ -24,10 +24,10 @@ func (mh *mockHeaderGetter) GetHeader() *types.Header {
 
 func Test_sequenceStaleCheck(t *testing.T) {
 	mh := mockHeaderGetter{target: 3, headerNumber: 10}
-	staleCheck := newStaleSequenceCheck(hclog.L(), mh.GetHeader, 10*time.Millisecond)
+	staleCheck := newStaleSequenceCheck(hclog.L(), mh.GetHeader, 1*time.Millisecond)
 	staleCheck.setSequence(9)
 
-	timeout := time.NewTicker(1 * time.Second)
+	timeout := time.NewTicker(10 * time.Millisecond)
 	state := make(chan int)
 	staleCheck.startChecking()
 	go func() {
@@ -44,6 +44,37 @@ func Test_sequenceStaleCheck(t *testing.T) {
 	result := <-state
 
 	staleCheck.stopChecking()
+
+	if result == 1 {
+		t.Fatal("test timed out waiting for condition")
+	}
+}
+
+// start a longer running check and stop it mid-flow
+func Test_sequenceStaleCheck_QuitWhilstChecking(t *testing.T) {
+	mh := mockHeaderGetter{target: 5, headerNumber: 10}
+	staleCheck := newStaleSequenceCheck(hclog.L(), mh.GetHeader, 1*time.Millisecond)
+	staleCheck.setSequence(9)
+
+	timeout := time.NewTicker(10 * time.Millisecond)
+	state := make(chan int)
+	staleCheck.startChecking()
+	go func() {
+		select {
+		case <-timeout.C:
+			state <- 1
+			return
+		case <-staleCheck.sequenceShouldStop:
+			state <- 2
+			return
+		}
+	}()
+
+	timer := time.NewTimer(2 * time.Millisecond)
+	<-timer.C
+	staleCheck.stopChecking()
+
+	result := <-state
 
 	if result == 1 {
 		t.Fatal("test timed out waiting for condition")
