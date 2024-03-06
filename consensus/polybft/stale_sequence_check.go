@@ -11,7 +11,7 @@ type staleSequenceCheck struct {
 	logger             hclog.Logger
 	currentSequence    uint64
 	mtx                *sync.Mutex
-	checkDuration      time.Duration
+	checkFrequency     time.Duration
 	sequenceShouldStop chan struct{}
 	quit               chan struct{}
 	getHeader          func() *types.Header
@@ -19,18 +19,18 @@ type staleSequenceCheck struct {
 
 func newStaleSequenceCheck(logger hclog.Logger, getHeader func() *types.Header, checkDuration time.Duration) *staleSequenceCheck {
 	return &staleSequenceCheck{
-		logger:             logger,
-		currentSequence:    0,
-		mtx:                &sync.Mutex{},
-		checkDuration:      checkDuration,
-		sequenceShouldStop: make(chan struct{}, 1),
-		quit:               make(chan struct{}),
-		getHeader:          getHeader,
+		logger:          logger,
+		currentSequence: 0,
+		mtx:             &sync.Mutex{},
+		checkFrequency:  checkDuration,
+		getHeader:       getHeader,
 	}
 }
 
 func (s *staleSequenceCheck) startChecking() {
-	ticker := time.NewTicker(s.checkDuration)
+	s.sequenceShouldStop = make(chan struct{}, 1)
+	s.quit = make(chan struct{})
+	ticker := time.NewTicker(s.checkFrequency)
 	go func() {
 		for {
 			select {
