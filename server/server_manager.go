@@ -168,10 +168,10 @@ func (m *Manager) Start() error {
 }
 
 func (m *Manager) createServer(
-	config *Config,
-	forkNumber int,
-	isRelayer bool,
-	txHandoff string,
+    config *Config,
+    forkNumber int,
+    isRelayer bool,
+    txHandoff string,
 ) (*Server, error) {
 	return NewManagedServer(
 		config,
@@ -272,7 +272,9 @@ func (m *Manager) loadNextFork() error {
 					if ok {
 						cfg, ok = cfg["eventTrackerStartBlocks"].(map[string]interface{})
 						if ok {
-							cfg[contracts.StateReceiverContract.String()] = *lastFork.To
+							if _, ok = cfg[contracts.StateReceiverContract.String()]; !ok {
+								cfg[contracts.StateReceiverContract.String()] = *lastFork.To
+							}
 						}
 					}
 				}
@@ -364,10 +366,10 @@ func (m *Manager) handleForkGenesisOverrides(fork chain.EngineFork) error {
 }
 
 func (m *Manager) insertPolybftForkBlock(
-	fork chain.EngineFork,
-	currentHeader *types.Header,
-	blockchain *blockchain.Blockchain,
-	executor *state.Executor,
+    fork chain.EngineFork,
+    currentHeader *types.Header,
+    blockchain *blockchain.Blockchain,
+    executor *state.Executor,
 ) error {
 	if fork.Alloc == nil {
 		// only interested if the fork block has allocs so we can handle the state root changees for them
