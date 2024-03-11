@@ -13,7 +13,8 @@ type staleSequenceCheck struct {
 	mtx                *sync.Mutex
 	checkFrequency     time.Duration
 	sequenceShouldStop chan struct{}
-	quit               chan struct{}
+	stop               chan struct{}
+	stopped            chan struct{}
 	getHeader          func() *types.Header
 }
 
@@ -29,12 +30,14 @@ func newStaleSequenceCheck(logger hclog.Logger, getHeader func() *types.Header, 
 
 func (s *staleSequenceCheck) startChecking() {
 	s.sequenceShouldStop = make(chan struct{}, 1)
-	s.quit = make(chan struct{})
+	s.stop = make(chan struct{})
+	s.stopped = make(chan struct{})
 	ticker := time.NewTicker(s.checkFrequency)
 	go func() {
+		defer close(s.stopped)
 		for {
 			select {
-			case <-s.quit:
+			case <-s.stop:
 				close(s.sequenceShouldStop)
 				ticker.Stop()
 				return
@@ -46,7 +49,8 @@ func (s *staleSequenceCheck) startChecking() {
 }
 
 func (s *staleSequenceCheck) stopChecking() {
-	close(s.quit)
+	close(s.stop)
+	<-s.stopped
 }
 
 func (s *staleSequenceCheck) setSequence(sequence uint64) {
