@@ -339,6 +339,7 @@ func (s *Server) keepAliveMinimumPeerConnections() {
 	for i, bootNode := range bootNodes {
 		if bootNode.ID == ourId {
 			bootNodes = append(bootNodes[:i], bootNodes[i+1:]...)
+			break
 		}
 	}
 
@@ -351,10 +352,8 @@ func (s *Server) keepAliveMinimumPeerConnections() {
 			return
 		}
 
-		currentPeers := s.numPeers()
-
 		// if we're in a setup where we just want random peering
-		if currentPeers < MinimumPeerConnections && (s.config.NoDiscover || !s.bootnodes.hasBootnodes()) {
+		if s.numPeers() < MinimumPeerConnections && (s.config.NoDiscover || !s.bootnodes.hasBootnodes()) {
 			// dial unconnected peer
 			randPeer := s.GetRandomPeer()
 			s.logger.Info("[serverKeepAlive] adding random peer", "id", randPeer.String())
@@ -365,7 +364,7 @@ func (s *Server) keepAliveMinimumPeerConnections() {
 
 		// ensure we attempt to connect to all of our bootNodes
 		peers := s.Peers()
-		var added []string
+		added := make([]string, 0, MaximumDialsPerKeepAlive)
 		connected := 0
 		for _, bootNode := range bootNodes {
 			shouldAdd := true
