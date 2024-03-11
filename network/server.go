@@ -344,8 +344,6 @@ func (s *Server) keepAliveMinimumPeerConnections() {
 
 	s.logger.Info("[serverKeepAlive] starting keepalive", "bootNodes", bootNodes)
 
-	neededBootNodes := int64(len(bootNodes))
-
 	for {
 		select {
 		case <-time.After(10 * time.Second):
@@ -354,7 +352,6 @@ func (s *Server) keepAliveMinimumPeerConnections() {
 		}
 
 		currentPeers := s.numPeers()
-		s.logger.Info("[serverKeepAlive] checking", "active", currentPeers)
 
 		// if we're in a setup where we just want random peering
 		if currentPeers < MinimumPeerConnections && (s.config.NoDiscover || !s.bootnodes.hasBootnodes()) {
@@ -366,27 +363,29 @@ func (s *Server) keepAliveMinimumPeerConnections() {
 			}
 		}
 
-		// if we have bootnodes and some aren't connected then attempt the dial
-		added := 0
-		if currentPeers < neededBootNodes {
-			for _, bootNode := range bootNodes {
-				shouldAdd := true
-				for _, p := range s.Peers() {
-					if p.Info.ID == bootNode.ID {
-						shouldAdd = false
-						break
-					}
+		// ensure we attempt to connect to all of our bootNodes
+		peers := s.Peers()
+		var added []string
+		connected := 0
+		for _, bootNode := range bootNodes {
+			shouldAdd := true
+			for _, p := range peers {
+				if p.Info.ID == bootNode.ID {
+					shouldAdd = false
+					connected++
+					break
 				}
-				if shouldAdd {
-					s.logger.Info("[serverKeepAlive] attempting dial", "id", bootNode.ID)
-					s.addToDialQueue(bootNode, common.PriorityRandomDial)
-					added++
-					if added >= MaximumDialsPerKeepAlive {
-						break
-					}
+			}
+			if shouldAdd {
+				added = append(added, bootNode.ID.String())
+				s.addToDialQueue(bootNode, common.PriorityRandomDial)
+				if len(added) >= MaximumDialsPerKeepAlive {
+					break
 				}
 			}
 		}
+
+		s.logger.Info("[serverKeepAlive] checked", "connected-count", connected, "added", added)
 	}
 }
 
