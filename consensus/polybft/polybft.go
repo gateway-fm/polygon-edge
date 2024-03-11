@@ -570,7 +570,7 @@ func (p *Polybft) startConsensusProtocol() {
 		return
 	}
 
-	p.logger.Debug("peers connected")
+	p.logger.Info("peers connected, starting consensus protocol")
 
 	newBlockSub := p.blockchain.SubscribeEvents()
 	defer newBlockSub.Close()
