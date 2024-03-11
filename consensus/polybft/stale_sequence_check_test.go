@@ -80,3 +80,16 @@ func Test_sequenceStaleCheck_QuitWhilstChecking(t *testing.T) {
 		t.Fatal("test timed out waiting for condition")
 	}
 }
+
+// a bug highlighted an issue with calling close on a closed channel so this test
+// proves off multiple calls to start and stop.
+func Test_sequenceStaleCheck_ChannelCheck(t *testing.T) {
+	mh := mockHeaderGetter{target: 5, headerNumber: 10}
+	staleCheck := newStaleSequenceCheck(hclog.L(), mh.GetHeader, 1*time.Millisecond)
+	staleCheck.setSequence(9)
+
+	for i := 0; i < 1000; i++ {
+		staleCheck.startChecking()
+		staleCheck.stopChecking()
+	}
+}
