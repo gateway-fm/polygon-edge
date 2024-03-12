@@ -114,6 +114,7 @@ func (t *TxRelayerImpl) sendTransactionLocked(txn *ethgo.Transaction, key ethgo.
 	if err != nil {
 		return ethgo.ZeroHash, err
 	}
+	fmt.Println("[txRelayer] found nonce", nonce)
 
 	txn.Nonce = nonce
 
@@ -220,6 +221,7 @@ func (t *TxRelayerImpl) getNextNonce(address ethgo.Address) (uint64, error) {
 	defer t.nonceMapMtx.Unlock()
 
 	if !t.useNonceMap {
+		fmt.Println("[txRelayer] getting nonce from pending")
 		nonce, err := t.client.Eth().GetNonce(address, ethgo.Pending)
 		if err != nil {
 			return 0, err
@@ -227,6 +229,7 @@ func (t *TxRelayerImpl) getNextNonce(address ethgo.Address) (uint64, error) {
 		return nonce, nil
 	}
 
+	fmt.Println("[txRelayer] getting nonce with nonce map")
 	nonce, found := t.nonceMap[address]
 
 	if found {

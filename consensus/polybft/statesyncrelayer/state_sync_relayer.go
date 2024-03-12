@@ -64,6 +64,7 @@ func NewRelayer(
 
 		return nil
 	}
+	logger.Info("Created state sync relayer client", "endpoint", endpoint)
 
 	txRelayer, err := txrelayer.NewTxRelayer(txrelayer.WithClient(client))
 	if err != nil {
