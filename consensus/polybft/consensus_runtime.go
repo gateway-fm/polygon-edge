@@ -295,9 +295,11 @@ func (c *consensusRuntime) OnBlockInserted(fullBlock *types.FullBlock) {
 	if err := updateBlockMetrics(fullBlock.Block, c.lastBuiltBlock); err != nil {
 		c.logger.Error("failed to update block metrics", "error", err)
 	}
+	c.logger.Info("[newBlock] metrics updated")
 
 	// after the block has been written we reset the txpool so that the old transactions are removed
 	c.config.txPool.ResetWithHeaders(fullBlock.Block.Header)
+	c.logger.Info("[newBlock] txpool reset")
 
 	var (
 		epoch = c.epoch
@@ -313,32 +315,37 @@ func (c *consensusRuntime) OnBlockInserted(fullBlock *types.FullBlock) {
 	if err := c.stateSyncManager.PostBlock(postBlock); err != nil {
 		c.logger.Error("failed to post block state sync", "err", err)
 	}
+	c.logger.Info("[newBlock] state sync complete")
 
 	// handle exit events that happened in block
 	if err := c.checkpointManager.PostBlock(postBlock); err != nil {
 		c.logger.Error("failed to post block in checkpoint manager", "err", err)
 	}
+	c.logger.Info("[newBlock] checkpoint manager complete")
 
 	// update proposer priorities
 	if err := c.proposerCalculator.PostBlock(postBlock); err != nil {
 		c.logger.Error("Could not update proposer calculator", "err", err)
 	}
+	c.logger.Info("[newBlock] proposer calculator complete")
 
 	// handle transfer events that happened in block
 	if err := c.stakeManager.PostBlock(postBlock); err != nil {
 		c.logger.Error("failed to post block in stake manager", "err", err)
 	}
+	c.logger.Info("[newBlock] stake manager complete")
 
 	if isEndOfEpoch {
 		if epoch, err = c.restartEpoch(fullBlock.Block.Header); err != nil {
 			c.logger.Error("failed to restart epoch after block inserted", "error", err)
 			return
 		}
+		c.logger.Info("[newBlock] restart epoch complete")
 
 		// PALM HACK - testing something out - remove - I don't think state is being updated at the end of an epoch properly
 		//epoch.Number++
 
-		c.logger.Debug("onBlockInserted after restartEpoch", "epoch", epoch.Number)
+		c.logger.Info("onBlockInserted after restartEpoch", "epoch", epoch.Number)
 	}
 
 	// finally update runtime state (lastBuiltBlock, epoch, proposerSnapshot)
