@@ -68,7 +68,27 @@ func (s *CheckpointStore) initialize(tx *bolt.Tx) error {
 		return fmt.Errorf("failed to create bucket=%s: %w", string(exitEventLastProcessedBlockBucket), err)
 	}
 
-	return tx.Bucket(exitEventLastProcessedBlockBucket).Put(lastProcessedBlockKey, common.EncodeUint64ToBytes(0))
+	shouldResetLastProcessed := false
+	if err := s.db.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(exitEventLastProcessedBlockBucket)
+		if bucket == nil {
+			shouldResetLastProcessed = true
+			return nil
+		}
+		v := bucket.Get(lastProcessedBlockKey)
+		if v == nil {
+			shouldResetLastProcessed = true
+		}
+		return nil
+	}); err != nil {
+		return err
+	}
+
+	if shouldResetLastProcessed {
+		return tx.Bucket(exitEventLastProcessedBlockBucket).Put(lastProcessedBlockKey, common.EncodeUint64ToBytes(0))
+	}
+
+	return nil
 }
 
 // insertExitEvents inserts a slice of exit events to exit event bucket in bolt db

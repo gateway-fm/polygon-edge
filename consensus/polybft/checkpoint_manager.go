@@ -327,7 +327,6 @@ func (c *checkpointManager) PostBlock(req *PostBlockRequest) error {
 	if err != nil {
 		return fmt.Errorf("could not get last processed block for exit events. Error: %w", err)
 	}
-	c.logger.Info("[checkPointManager] read last block", "block", lastBlock)
 
 	if lastBlock == 0 {
 		// if we are running in a forked context here we need to make sure that we update the last block
@@ -343,8 +342,6 @@ func (c *checkpointManager) PostBlock(req *PostBlockRequest) error {
 		return err
 	}
 
-	c.logger.Info("[checkPointManager] got exit events", "count", len(exitEvents))
-
 	sort.Slice(exitEvents, func(i, j int) bool {
 		// keep events in sequential order
 		return exitEvents[i].ID.Cmp(exitEvents[j].ID) < 0
@@ -353,8 +350,6 @@ func (c *checkpointManager) PostBlock(req *PostBlockRequest) error {
 	if err := c.state.CheckpointStore.insertExitEvents(exitEvents); err != nil {
 		return err
 	}
-
-	c.logger.Info("[checkPointManager] written exit events")
 
 	if err := c.state.CheckpointStore.updateLastSaved(block); err != nil {
 		return err
