@@ -257,6 +257,8 @@ func (c *consensusRuntime) getGuardedData() (guardedDataDTO, error) {
 	c.lock.RLock()
 	defer c.lock.RUnlock()
 
+	c.logger.Info("getting guarded data")
+
 	lastBuiltBlock := c.lastBuiltBlock.Copy()
 	epoch := new(epochMetadata)
 	*epoch = *c.epoch // shallow copy, don't need to make validators copy because AccountSet is immutable
@@ -380,7 +382,9 @@ func (c *consensusRuntime) FSM() error {
 
 	valSet := validator.NewValidatorSet(epoch.Validators, c.logger)
 
+	c.logger.Info("building event root", "endOfSprint", isEndOfSprint, "endOfEpoch", isEndOfEpoch)
 	exitRootHash, err := c.checkpointManager.BuildEventRoot(epoch.Number)
+	c.logger.Info("built event root")
 	if err != nil {
 		return fmt.Errorf("could not build exit root hash for fsm: %w", err)
 	}

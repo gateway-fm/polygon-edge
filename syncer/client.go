@@ -338,6 +338,7 @@ func (m *syncPeerClient) GetBlocks(
 				if !ok {
 					return
 				}
+				m.logger.Info("Stream block channel closed")
 
 				blockCh <- block
 			case err := <-streamErrorCh:

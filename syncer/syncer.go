@@ -221,6 +221,7 @@ func (s *syncer) bulkSyncWithPeer(peerID peer.ID, newBlockCallback func(*types.F
 	localLatest := s.blockchain.Header().Number
 	shouldTerminate := false
 
+	s.logger.Info("Starting getting blocks", "peer", peerID, "block", localLatest+1)
 	blockCh, err := s.syncPeerClient.GetBlocks(peerID, localLatest+1, s.blockTimeout)
 	if err != nil {
 		return 0, false, err
