@@ -15,6 +15,7 @@ import (
 	"github.com/libp2p/go-libp2p/core/peer"
 	"google.golang.org/grpc"
 	grpcPeer "google.golang.org/grpc/peer"
+	"fmt"
 )
 
 type GrpcStream struct {
@@ -80,7 +81,10 @@ func (g *GrpcStream) Client(stream network.Stream) (*grpc.ClientConn, error) {
 
 func (g *GrpcStream) Serve() {
 	go func() {
-		_ = g.grpcServer.Serve(g)
+		err := g.grpcServer.Serve(g)
+		if err != nil {
+			fmt.Println("[grpcStream] error calling serve", err)
+		}
 	}()
 }
 

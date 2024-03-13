@@ -384,7 +384,7 @@ func (s *Server) keepAliveMinimumPeerConnections() {
 			}
 		}
 
-		s.logger.Info("[serverKeepAlive] checked", "connected-count", connected, "added", added)
+		s.logger.Info("[serverKeepAlive] checked", "total", s.numPeers(), "already-connected", connected, "added", added)
 	}
 }
 
