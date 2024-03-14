@@ -11,6 +11,7 @@ import (
 	"github.com/umbracle/ethgo"
 	"github.com/umbracle/ethgo/jsonrpc"
 	"github.com/umbracle/ethgo/wallet"
+	"github.com/0xPolygon/polygon-edge/helper/hex"
 )
 
 const (
@@ -127,6 +128,7 @@ func (t *TxRelayerImpl) sendTransactionLocked(txn *ethgo.Transaction, key ethgo.
 		}
 
 		txn.GasPrice = gasPrice + (gasPrice * gasPricePercent / 100)
+		fmt.Println("[txRelayer] set gas price", txn.GasPrice)
 	}
 
 	if txn.Gas == 0 {
@@ -136,6 +138,7 @@ func (t *TxRelayerImpl) sendTransactionLocked(txn *ethgo.Transaction, key ethgo.
 		}
 
 		txn.Gas = gasLimit + (gasLimit * gasLimitPercent / 100)
+		fmt.Println("[txRelayer] set gas", txn.Gas)
 	}
 
 	chainID, err := t.client.Eth().ChainID()
@@ -158,6 +161,9 @@ func (t *TxRelayerImpl) sendTransactionLocked(txn *ethgo.Transaction, key ethgo.
 			fmt.Sprintf("[TxRelayer.SendTransaction]\nFrom = %s \nGas = %d \nGas Price = %d\nNonce=%v\n",
 				txn.From, txn.Gas, txn.GasPrice, txn.Nonce)))
 	}
+
+	asHex := "0x" + hex.EncodeToString(data)
+	fmt.Println("[txRelayer] raw data", asHex)
 
 	return t.client.Eth().SendRawTransaction(data)
 }
