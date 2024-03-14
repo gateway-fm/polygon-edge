@@ -618,7 +618,7 @@ func (p *Polybft) startConsensusProtocol() {
 		}
 
 		isValidator := currentValidators.ContainsNodeID(p.key.String())
-		p.logger.Info("polybft validator check", "isValidator", isValidator, "key", p.key.String(), "validators", currentValidators)
+		p.logger.Debug("polybft validator check", "isValidator", isValidator, "key", p.key.String(), "validators", currentValidators)
 		p.runtime.setIsActiveValidator(isValidator)
 
 		p.txPool.SetSealing(isValidator) // update tx pool
