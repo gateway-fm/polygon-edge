@@ -262,37 +262,61 @@ func (v *validatorsSnapshotCache) cleanup() error {
 
 		v.logger.Info("validators snapshots cleaned up", "latest-epoch", latestEpoch)
 
-		// removed until we can understand why this drops the db every time
-		//return v.state.EpochStore.cleanValidatorSnapshotsFromDB(latestEpoch)
+		removed until we can understand why this drops the db every time
+		return v.state.EpochStore.cleanValidatorSnapshotsFromDB(latestEpoch)
 	}
 
 	return nil
 }
 
 // getLastSnapshot gets the latest snapshot from cache or db based on the passed epoch number
-func (v *validatorsSnapshotCache) getLastSnapshot(currentEpoch uint64) (*validatorSnapshot, error) {
-	epochToQuery := currentEpoch
+func (v *validatorsSnapshotCache) getLastSnapshot(epoch uint64) (*validatorSnapshot, error) {
+	snapshot := v.snapshots[epoch]
+	if snapshot != nil {
+		v.logger.Debug("vals: found cached snapshot immediately", "epoch", epoch)
+		return snapshot, nil
+	}
 
-	cachedSnapshot := v.snapshots[currentEpoch]
-	if cachedSnapshot != nil {
-		v.logger.Info("vals: found cached snapshot immediately", "epoch", currentEpoch)
-		return cachedSnapshot, nil
+	// now try the DB to see if the snapshot is there
+	snapshot, err := v.state.EpochStore.getValidatorSnapshot(epoch)
+	if err != nil {
+		// log the error and move on
+		v.logger.Error("vals: failed to get snapshot from db", "epoch", epoch, "err", err)
+	}
+	if snapshot != nil {
+		v.logger.Info("vals: found snapshot in db immediately - adding to cache", "epoch", epoch)
+		// store this epoch in the cache for later
+		v.snapshots[epoch] = snapshot.copy()
+		return snapshot, nil
 	}
 
 	// if we do not have a snapshot in memory for given epoch, we will get the latest one we have
-	for ; currentEpoch >= 0; currentEpoch-- {
-		cachedSnapshot = v.snapshots[currentEpoch]
-		if cachedSnapshot != nil {
-			v.logger.Info("vals: found snapshot in memory cache", "epoch", currentEpoch)
+	for ; epoch >= 0; epoch-- {
+		snapshot = v.snapshots[epoch]
+		if snapshot != nil {
+			v.logger.Debug("vals: found snapshot in memory cache", "epoch", epoch)
 			break
 		}
 
-		if currentEpoch == 0 { // prevent uint64 underflow
+		// check the db also for this snapshot
+		snapshot, err = v.state.EpochStore.getValidatorSnapshot(epoch)
+		if err != nil {
+			// log the error and move on
+			v.logger.Error("vals: failed to get snapshot from db", "epoch", epoch, "err", err)
+		}
+		if snapshot != nil {
+			v.logger.Info("vals: found snapshot in db - adding to cache", "epoch", epoch)
+			// store this epoch in the cache for later
+			v.snapshots[epoch] = snapshot.copy()
+			break
+		}
+
+		if epoch == 0 { // prevent uint64 underflow
 			break
 		}
 	}
 
-	dbSnapshot, err := v.state.EpochStore.getNearestOrEpochSnapshot(epochToQuery)
+	dbSnapshot, err := v.state.EpochStore.getLastSnapshot()
 	if err != nil {
 		return nil, err
 	}
@@ -300,18 +324,14 @@ func (v *validatorsSnapshotCache) getLastSnapshot(currentEpoch uint64) (*validat
 	if dbSnapshot != nil {
 		// if we do not have any snapshot in memory, or db snapshot is newer than the one in memory
 		// return the one from db
-		if cachedSnapshot == nil || dbSnapshot.Epoch > cachedSnapshot.Epoch {
-			cachedSnapshot = dbSnapshot
+		if snapshot == nil || dbSnapshot.Epoch > snapshot.Epoch {
+			snapshot = dbSnapshot
 			// save it in cache as well, since it doesn't exist
 			v.snapshots[dbSnapshot.Epoch] = dbSnapshot.copy()
 		}
 	}
 
-	if cachedSnapshot != nil && cachedSnapshot.Epoch > currentEpoch {
-		return nil, nil
-	}
-
-	return cachedSnapshot, nil
+	return snapshot, nil
 }
 
 // getNextEpochEndingBlock gets the epoch ending block of a newer epoch
