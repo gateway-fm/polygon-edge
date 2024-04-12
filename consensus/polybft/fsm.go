@@ -156,10 +156,12 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 	f.blockBuilder.Fill()
 
 	if f.isEndOfEpoch {
+		f.logger.Info("Applying end of epoch deltas", "deltas", f.newValidatorsDelta)
 		nextValidators, err = nextValidators.ApplyDelta(f.newValidatorsDelta)
 		if err != nil {
 			return nil, err
 		}
+		f.logger.Info("Applied deltas", "result", nextValidators)
 
 		extra.Validators = f.newValidatorsDelta
 	}

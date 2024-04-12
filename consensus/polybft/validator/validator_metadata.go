@@ -248,6 +248,7 @@ func (as AccountSet) Hash() (types.Hash, error) {
 func (as AccountSet) ToAPIBinding() []*contractsapi.Validator {
 	apiBinding := make([]*contractsapi.Validator, len(as))
 	for i, v := range as {
+		fmt.Printf("[accountSet] index: %v, address: %s, bls: %v \n", i, v.Address.String(), v.BlsKey)
 		apiBinding[i] = &contractsapi.Validator{
 			Address:     v.Address,
 			BlsKey:      v.BlsKey.ToBigInt(),
