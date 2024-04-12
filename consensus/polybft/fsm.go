@@ -20,6 +20,7 @@ import (
 	"github.com/0xPolygon/polygon-edge/contracts"
 	"github.com/0xPolygon/polygon-edge/state"
 	"github.com/0xPolygon/polygon-edge/types"
+	"github.com/ethereum/go-ethereum/log"
 )
 
 type blockBuilder interface {
@@ -155,7 +156,30 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 	// fill the block with transactions
 	f.blockBuilder.Fill()
 
+	currentValidatorAccounts := f.validators.Accounts()
+
+	currentValidatorsHash, err := currentValidatorAccounts.Hash()
+	if err != nil {
+		return nil, err
+	}
+
 	if f.isEndOfEpoch {
+		// hack / sticky plaster
+		// we may be missing a BLS key and the L1 could have a transient issue or hasn't been synced in
+		// a while so the bls key is missing from the delta, but we may have it in the existing validator
+		// set if it is an updated validator so check for that and fix it if we can
+		for _, update := range f.newValidatorsDelta.Updated {
+			if update.BlsKey != nil {
+				continue
+			}
+			for _, existing := range currentValidatorAccounts {
+				if existing.Address == update.Address {
+					update.BlsKey = existing.BlsKey
+					log.Info("Patched bls key for validator", "address", update.Address, "bls", update.BlsKey)
+				}
+			}
+		}
+
 		f.logger.Info("Applying end of epoch deltas", "deltas", f.newValidatorsDelta)
 		nextValidators, err = nextValidators.ApplyDelta(f.newValidatorsDelta)
 		if err != nil {
@@ -164,11 +188,6 @@ func (f *fsm) BuildProposal(currentRound uint64) ([]byte, error) {
 		f.logger.Info("Applied deltas", "result", nextValidators)
 
 		extra.Validators = f.newValidatorsDelta
-	}
-
-	currentValidatorsHash, err := f.validators.Accounts().Hash()
-	if err != nil {
-		return nil, err
 	}
 
 	nextValidatorsHash, err := nextValidators.Hash()

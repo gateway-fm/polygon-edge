@@ -252,20 +252,20 @@ func (s *stakeManager) UpdateValidatorSet(
 	}
 
 	for _, newValidator := range newValidatorSet {
-		if newValidator.BlsKey == nil {
-			newValidator.BlsKey, err = s.getBlsKey(newValidator.Address)
-			if err != nil {
-				return nil, fmt.Errorf("could not retrieve validator data. Address: %v. Error: %w",
-					newValidator.Address, err)
-			}
-		}
-
 		// check if its already in existing validator set
 		if oldValidator, exists := oldActiveMap[newValidator.Address]; exists {
 			if oldValidator.VotingPower.Cmp(newValidator.VotingPower) != 0 {
 				updatedValidators = append(updatedValidators, newValidator)
 			}
 		} else {
+			if newValidator.BlsKey == nil {
+				newValidator.BlsKey, err = s.getBlsKey(newValidator.Address)
+				if err != nil {
+					return nil, fmt.Errorf("could not retrieve validator data. Address: %v. Error: %w",
+						newValidator.Address, err)
+				}
+			}
+
 			addedValidators = append(addedValidators, newValidator)
 		}
 	}
