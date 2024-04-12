@@ -261,8 +261,6 @@ func (v *validatorsSnapshotCache) cleanup() error {
 		v.snapshots = cache
 
 		v.logger.Info("validators snapshots cleaned up", "latest-epoch", latestEpoch)
-
-		removed until we can understand why this drops the db every time
 		return v.state.EpochStore.cleanValidatorSnapshotsFromDB(latestEpoch)
 	}
 
