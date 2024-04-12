@@ -208,6 +208,7 @@ func (s *EpochStore) cleanValidatorSnapshotsFromDB(epoch uint64) error {
 
 		// we start the loop in reverse so that the oldest of snapshots get inserted first in db
 		for i := len(keys) - 1; i >= 0; i-- {
+			err = tx.Bucket(validatorSnapshotsBucket).Put(keys[i], values[i])
 			if err := bucket.Put(keys[i], values[i]); err != nil {
 				return err
 			}
