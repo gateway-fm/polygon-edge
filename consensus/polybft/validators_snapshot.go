@@ -128,7 +128,7 @@ func (v *validatorsSnapshotCache) GetSnapshot(
 				latestValidatorSnapshot.Epoch+1, err)
 		}
 
-		v.logger.Debug("vals: Applying delta", "epochEndBlock", nextEpochEndBlockNumber)
+		v.logger.Info("vals: Applying delta", "epochEndBlock", nextEpochEndBlockNumber)
 
 		intermediateSnapshot, err := v.computeSnapshot(latestValidatorSnapshot, nextEpochEndBlockNumber, parents)
 		if err != nil {
