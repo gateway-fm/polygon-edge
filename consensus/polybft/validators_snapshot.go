@@ -83,7 +83,7 @@ func (v *validatorsSnapshotCache) GetSnapshot(
 		epochToGetSnapshot--
 	}
 
-	v.logger.Debug("vals: Retrieving snapshot started...", "Block", blockNumber, "Epoch", epochToGetSnapshot)
+	v.logger.Info("vals: Retrieving snapshot started...", "block", blockNumber, "epoch", epochToGetSnapshot, "epoch-ending", epochEndingBlock)
 
 	latestValidatorSnapshot, err := v.getLastSnapshot(epochToGetSnapshot)
 	if err != nil {
@@ -91,7 +91,7 @@ func (v *validatorsSnapshotCache) GetSnapshot(
 	}
 
 	if latestValidatorSnapshot != nil && latestValidatorSnapshot.Epoch == epochToGetSnapshot {
-		v.logger.Debug("vals: latest validator snapshot matches epoch", "epoch", epochToGetSnapshot)
+		v.logger.Info("vals: latest validator snapshot matches epoch", "epoch", epochToGetSnapshot)
 		// we have snapshot for required block (epoch) in cache
 		return latestValidatorSnapshot.Snapshot, nil
 	}
@@ -260,6 +260,7 @@ func (v *validatorsSnapshotCache) cleanup() error {
 
 		v.snapshots = cache
 
+		v.logger.Info("validators snapshots cleaned up", "latest-epoch", latestEpoch)
 		return v.state.EpochStore.cleanValidatorSnapshotsFromDB(latestEpoch)
 	}
 
